@@ -25,18 +25,21 @@ func (s *Server) ListUsers(w http.ResponseWriter, r *http.Request) {
 	OK(w, map[string]any{"users": safe})
 }
 
-// CreateUser 创建用户（用户名唯一，密码策略统一校验）。
+// CreateUser 创建用户（用户名唯一，密码策略统一校验；可选手机号/邮箱）。
 func (s *Server) CreateUser(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Username string `json:"username"`
 		Password string `json:"password"`
 		Nickname string `json:"nickname"`
+		Phone    string `json:"phone"`
+		Email    string `json:"email"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Username == "" || req.Password == "" {
 		Fail(w, CodeBadParam, "参数错误")
 		return
 	}
-	if err := common.ValidatePassword(req.Password); err != nil {
+	policy := s.Settings.GetPasswordPolicy(r.Context())
+	if err := common.ValidatePasswordWithPolicy(req.Password, policy); err != nil {
 		Fail(w, CodeBadParam, err.Error())
 		return
 	}
@@ -55,11 +58,13 @@ func (s *Server) CreateUser(w http.ResponseWriter, r *http.Request) {
 		Username:     req.Username,
 		PasswordHash: hash,
 		Nickname:     req.Nickname,
+		Phone:        emptyToNil(req.Phone),
+		Email:        emptyToNil(req.Email),
 		Status:       1,
 	}
 	if err := s.Users.Create(r.Context(), u); err != nil {
 		if errors.Is(err, gorm.ErrDuplicatedKey) {
-			Fail(w, CodeUserExists, "用户名已存在")
+			Fail(w, CodeUserExists, "用户名、手机号或邮箱已存在")
 			return
 		}
 		s.internalError(w, err)
@@ -68,7 +73,7 @@ func (s *Server) CreateUser(w http.ResponseWriter, r *http.Request) {
 	OK(w, u.SafeUser())
 }
 
-// UpdateUser 更新用户（昵称/启用状态）。
+// UpdateUser 更新用户（昵称/手机号/邮箱/启用状态）。
 func (s *Server) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	id, err := pathID(r)
 	if err != nil {
@@ -77,6 +82,8 @@ func (s *Server) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	}
 	var req struct {
 		Nickname *string `json:"nickname"`
+		Phone    *string `json:"phone"`
+		Email    *string `json:"email"`
 		Status   *int    `json:"status"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -86,6 +93,12 @@ func (s *Server) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	updates := map[string]any{}
 	if req.Nickname != nil {
 		updates["nickname"] = *req.Nickname
+	}
+	if req.Phone != nil {
+		updates["phone"] = emptyToNilExpr(*req.Phone)
+	}
+	if req.Email != nil {
+		updates["email"] = emptyToNilExpr(*req.Email)
 	}
 	if req.Status != nil {
 		if id == currentUserID(r) && *req.Status != 1 {
@@ -99,6 +112,10 @@ func (s *Server) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.Users.Update(r.Context(), id, updates); err != nil {
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			Fail(w, CodeUserExists, "手机号或邮箱已被其他用户使用")
+			return
+		}
 		s.internalError(w, err)
 		return
 	}
@@ -165,6 +182,22 @@ func (s *Server) ResetPassword(w http.ResponseWriter, r *http.Request) {
 // pathID 解析路由路径参数 {id}。
 func pathID(r *http.Request) (int64, error) {
 	return strconv.ParseInt(r.PathValue("id"), 10, 64)
+}
+
+// emptyToNil 空串转 nil（手机号/邮箱为空时不落库，避免与唯一索引冲突）。
+func emptyToNil(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}
+
+// emptyToNilExpr 空串转 SQL NULL 表达式（更新时清空字段）。
+func emptyToNilExpr(s string) any {
+	if s == "" {
+		return gorm.Expr("NULL")
+	}
+	return s
 }
 
 // currentUserID 返回当前登录管理员 ID（由 adminAuth 中间件写入）。

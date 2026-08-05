@@ -42,8 +42,27 @@ func OpenDB(cfg *config.Config) (*gorm.DB, error) {
 	sqlDB.SetMaxOpenConns(20)
 	sqlDB.SetMaxIdleConns(10)
 
+	// 2.5 历史数据修复：phone/email 唯一索引要求空值使用 NULL（'' 会冲突）
+	mig := db.Migrator()
+	if mig.HasColumn(&model.User{}, "phone") {
+		if err := mig.AlterColumn(&model.User{}, "Phone"); err != nil { // 依据模型改为可空
+			return nil, fmt.Errorf("alter phone column: %w", err)
+		}
+		if err := db.Exec("UPDATE users SET phone = NULL WHERE phone = ''").Error; err != nil {
+			return nil, fmt.Errorf("fix phone column: %w", err)
+		}
+	}
+	if mig.HasColumn(&model.User{}, "email") {
+		if err := mig.AlterColumn(&model.User{}, "Email"); err != nil {
+			return nil, fmt.Errorf("alter email column: %w", err)
+		}
+		if err := db.Exec("UPDATE users SET email = NULL WHERE email = ''").Error; err != nil {
+			return nil, fmt.Errorf("fix email column: %w", err)
+		}
+	}
+
 	// 3. 按 model 定义建表（AutoMigrate）
-	if err := db.AutoMigrate(&model.User{}, &model.Platform{}, &model.UserPlatformGrant{}, &model.LoginLog{}); err != nil {
+	if err := db.AutoMigrate(&model.User{}, &model.Platform{}, &model.UserPlatformGrant{}, &model.LoginLog{}, &model.SysSetting{}); err != nil {
 		return nil, fmt.Errorf("automigrate: %w", err)
 	}
 	return db, nil

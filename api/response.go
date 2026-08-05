@@ -17,6 +17,7 @@ const (
 	CodeUnauthorized = 1006
 	CodeBadParam     = 1007
 	CodeUserExists   = 1008
+	CodeIPDenied     = 1009 // IP 不在后台登录白名单
 	CodeInternal     = 2001
 )
 

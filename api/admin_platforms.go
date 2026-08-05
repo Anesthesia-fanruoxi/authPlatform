@@ -15,15 +15,17 @@ import (
 var platformIDRe = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}$`)
 
 // safePlatform 脱敏平台信息：不泄露 secret 明文；showSecret 时返回完整明文
-// （仅用于创建/轮换后的一次性展示）。
+// （仅用于创建/轮换后的一次性展示）。login_methods 输出解析后的数组。
 func safePlatform(p *model.Platform, masterKey string, showSecret bool) map[string]any {
 	out := map[string]any{
-		"id":           p.ID,
-		"platform_id":  p.PlatformID,
-		"name":         p.Name,
-		"ip_whitelist": p.IPWhitelist,
-		"status":       p.Status,
-		"created_at":   p.CreatedAt.Format(time.RFC3339),
+		"id":                 p.ID,
+		"platform_id":        p.PlatformID,
+		"name":               p.Name,
+		"ip_whitelist":       p.IPWhitelist,
+		"status":             p.Status,
+		"created_at":         p.CreatedAt.Format(time.RFC3339),
+		"login_methods":      platformLoginMethods(p),
+		"login_methods_custom": p.LoginMethods != "",
 	}
 	if plain, err := common.DecryptSecret(masterKey, p.SecretEnc); err == nil {
 		if showSecret {
@@ -38,6 +40,18 @@ func safePlatform(p *model.Platform, masterKey string, showSecret bool) map[stri
 		out["has_old_secret"] = true // 处于双盐过渡期
 	}
 	return out
+}
+
+// platformLoginMethods 解析平台 login_methods JSON；解析失败返回 nil。
+func platformLoginMethods(p *model.Platform) []string {
+	if p.LoginMethods == "" {
+		return nil
+	}
+	var list []string
+	if err := json.Unmarshal([]byte(p.LoginMethods), &list); err != nil {
+		return nil
+	}
+	return list
 }
 
 // ListPlatforms 平台列表（secret 脱敏）。
@@ -55,11 +69,13 @@ func (s *Server) ListPlatforms(w http.ResponseWriter, r *http.Request) {
 }
 
 // CreatePlatform 创建平台：生成独立盐并加密存储，明文仅此一次返回。
+// login_methods 可选：空 = 使用系统设置中的新平台默认登录方式。
 func (s *Server) CreatePlatform(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		PlatformID  string `json:"platform_id"`
-		Name        string `json:"name"`
-		IPWhitelist string `json:"ip_whitelist"`
+		PlatformID   string   `json:"platform_id"`
+		Name         string   `json:"name"`
+		IPWhitelist  string   `json:"ip_whitelist"`
+		LoginMethods []string `json:"login_methods"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.PlatformID == "" || req.Name == "" {
 		Fail(w, CodeBadParam, "参数错误")
@@ -68,6 +84,15 @@ func (s *Server) CreatePlatform(w http.ResponseWriter, r *http.Request) {
 	if !platformIDRe.MatchString(req.PlatformID) {
 		Fail(w, CodeBadParam, "platform_id 只能包含小写字母、数字和连字符")
 		return
+	}
+	var lmText string
+	if len(req.LoginMethods) > 0 {
+		if _, err := common.ValidateLoginMethods(req.LoginMethods); err != nil {
+			Fail(w, CodeBadParam, err.Error())
+			return
+		}
+		b, _ := json.Marshal(req.LoginMethods)
+		lmText = string(b)
 	}
 	secret, err := common.NewPlatformSecret()
 	if err != nil {
@@ -80,11 +105,12 @@ func (s *Server) CreatePlatform(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p := &model.Platform{
-		PlatformID:  req.PlatformID,
-		Name:        req.Name,
-		SecretEnc:   enc,
-		IPWhitelist: req.IPWhitelist,
-		Status:      1,
+		PlatformID:   req.PlatformID,
+		Name:         req.Name,
+		SecretEnc:    enc,
+		IPWhitelist:  req.IPWhitelist,
+		LoginMethods: lmText,
+		Status:       1,
 	}
 	if err := s.Platforms.Create(r.Context(), p); err != nil {
 		if errors.Is(err, gorm.ErrDuplicatedKey) {
@@ -107,9 +133,10 @@ func (s *Server) UpdatePlatform(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		Name        *string `json:"name"`
-		Status      *int    `json:"status"`
-		IPWhitelist *string `json:"ip_whitelist"`
+		Name         *string  `json:"name"`
+		Status       *int     `json:"status"`
+		IPWhitelist  *string  `json:"ip_whitelist"`
+		LoginMethods *[]string `json:"login_methods"` // nil=不改；空数组=清除（用全局默认）
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		Fail(w, CodeBadParam, "参数错误")
@@ -124,6 +151,18 @@ func (s *Server) UpdatePlatform(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.IPWhitelist != nil {
 		updates["ip_whitelist"] = *req.IPWhitelist
+	}
+	if req.LoginMethods != nil {
+		if len(*req.LoginMethods) == 0 {
+			updates["login_methods"] = "" // 清除，回退全局默认
+		} else {
+			if _, err := common.ValidateLoginMethods(*req.LoginMethods); err != nil {
+				Fail(w, CodeBadParam, err.Error())
+				return
+			}
+			b, _ := json.Marshal(*req.LoginMethods)
+			updates["login_methods"] = string(b)
+		}
 	}
 	if len(updates) == 0 {
 		Fail(w, CodeBadParam, "参数错误")

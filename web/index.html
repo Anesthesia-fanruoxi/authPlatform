@@ -6,30 +6,142 @@
 <title>authPlatform 管理控制台</title>
 <link rel="stylesheet" href="/vendor/index.css">
 <style>
+  /* ===== 基础 ===== */
+  :root {
+    --brand: #2f6fed;
+    --brand-dark: #2458c8;
+    --brand-light: #6b9bf2;
+    --ink: #1f2d3d;
+    --ink-2: #5a6b82;
+    --ink-3: #8a97ab;
+    --line: #eef1f6;
+    --bg: #f4f6fb;
+    --sidebar-bg: linear-gradient(180deg, #0d1b33 0%, #13294f 100%);
+
+    /* Element Plus 主题变量覆盖 */
+    --el-color-primary: #2f6fed;
+    --el-color-primary-light-3: #6b9bf2;
+    --el-color-primary-light-5: #93b5f5;
+    --el-color-primary-light-7: #bcd0f8;
+    --el-color-primary-light-8: #d4e1fb;
+    --el-color-primary-light-9: #ecf2fe;
+    --el-color-primary-dark-2: #2458c8;
+    --el-border-radius-base: 6px;
+    --el-border-radius-small: 4px;
+    --el-border-radius-round: 20px;
+    --el-box-shadow-light: 0 4px 16px rgba(15, 31, 77, .08);
+    --el-font-family: "Helvetica Neue", Helvetica, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif;
+  }
   * { box-sizing: border-box; }
-  html, body { height: 100%; margin: 0; background: #f0f2f5;
-    font-family: "Helvetica Neue", Helvetica, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif; }
+  html, body { height: 100%; margin: 0; background: var(--bg);
+    font-family: var(--el-font-family); color: var(--ink); -webkit-font-smoothing: antialiased; }
   #app { height: 100%; }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: #c9d2e0; border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: #aeb9cb; }
+  ::-webkit-scrollbar-track { background: transparent; }
 
-  /* 登录页 */
-  .login-wrap { height: 100%; display: flex; align-items: center; justify-content: center;
-    background: linear-gradient(135deg, #1f2d3d 0%, #33425b 55%, #3a6ea5 130%); }
-  .login-card { width: 380px; border-radius: 10px; box-shadow: 0 12px 40px rgba(0,0,0,.3); }
-  .login-card .el-card__header { text-align: center; font-size: 18px; letter-spacing: 1px; }
+  /* ===== 登录页 ===== */
+  .login-wrap { height: 100%; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden;
+    background: linear-gradient(135deg, #0a1633 0%, #15336e 48%, #2f5fd0 100%); }
+  .login-wrap::before, .login-wrap::after { content: ''; position: absolute; border-radius: 50%; filter: blur(90px); }
+  .login-wrap::before { width: 520px; height: 520px; top: -140px; right: -100px;
+    background: radial-gradient(circle, rgba(103, 165, 255, .55), transparent 70%); }
+  .login-wrap::after { width: 460px; height: 460px; bottom: -120px; left: -80px;
+    background: radial-gradient(circle, rgba(139, 112, 255, .45), transparent 70%); }
+  .login-grid { position: absolute; inset: 0; opacity: .35;
+    background-image: linear-gradient(rgba(255,255,255,.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.05) 1px, transparent 1px);
+    background-size: 44px 44px; }
+  .login-card { position: relative; z-index: 1; width: 400px; padding: 36px 36px 26px; border-radius: 16px;
+    background: rgba(255, 255, 255, .95); backdrop-filter: blur(14px);
+    border: 1px solid rgba(255, 255, 255, .6);
+    box-shadow: 0 24px 64px rgba(3, 12, 40, .4); }
+  .login-brand { text-align: center; margin-bottom: 26px; }
+  .login-logo { display: inline-flex; align-items: center; justify-content: center; width: 56px; height: 56px; border-radius: 16px;
+    background: linear-gradient(135deg, #2f6fed 0%, #5b8cff 100%);
+    box-shadow: 0 8px 20px rgba(47, 111, 237, .35); }
+  .login-logo svg { width: 28px; height: 28px; stroke: #fff; }
+  .login-title { margin: 16px 0 4px; font-size: 22px; font-weight: 700; letter-spacing: .5px; color: #0d1b33; }
+  .login-sub { margin: 0; font-size: 13px; color: var(--ink-3); letter-spacing: 1px; }
+  .login-form .el-input__wrapper { border-radius: 8px; padding: 2px 12px; }
+  .login-form .el-input__prefix svg, .login-form .el-input__suffix svg { width: 16px; height: 16px; stroke: #9aa7bd; }
+  .login-btn { margin-top: 6px; height: 44px; font-size: 15px; letter-spacing: 4px; border-radius: 8px;
+    background: linear-gradient(135deg, #2f6fed 0%, #4a7dff 100%);
+    border: none; box-shadow: 0 8px 18px rgba(47, 111, 237, .35); }
+  .login-btn:hover { opacity: .92; }
+  .login-foot { margin-top: 20px; text-align: center; font-size: 12px; color: #b3bccb; }
 
-  /* 布局 */
+  /* ===== 布局 ===== */
   .layout { height: 100%; }
-  .logo { height: 60px; line-height: 60px; text-align: center; font-weight: 700; font-size: 17px;
-    color: #409eff; background: #fff; letter-spacing: 1px; border-bottom: 1px solid #e6e6e6; }
-  .el-aside { background: #fff; border-right: 1px solid #e6e6e6; }
-  .el-aside .el-menu { border-right: none; }
-  .hdr { display: flex; justify-content: flex-end; align-items: center; background: #fff;
-    box-shadow: 0 1px 4px rgba(0,0,0,.08); color: #333; font-size: 14px; }
-  .el-main { padding: 16px; }
+  .sidebar { background: var(--sidebar-bg); display: flex; flex-direction: column; }
+  .logo { height: 64px; display: flex; align-items: center; justify-content: center; gap: 10px;
+    border-bottom: 1px solid rgba(255,255,255,.07); }
+  .logo-icon { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 9px;
+    background: linear-gradient(135deg, #2f6fed, #5b8cff); box-shadow: 0 4px 10px rgba(47, 111, 237, .45); }
+  .logo-icon svg { width: 18px; height: 18px; stroke: #fff; }
+  .logo-text { color: #fff; font-size: 17px; font-weight: 700; letter-spacing: 1px; }
+  .side-menu { flex: 1; background: transparent; border-right: none; padding: 10px 0; }
+  .side-menu .el-menu-item { height: 46px; margin: 3px 10px; padding: 0 14px !important; border-radius: 9px;
+    color: rgba(255,255,255,.65); font-size: 14px; }
+  .side-menu .el-menu-item .m-icon { display: inline-flex; margin-right: 10px; }
+  .side-menu .el-menu-item .m-icon svg { width: 17px; height: 17px; vertical-align: -3px; }
+  .ic-btn { display: inline-flex; margin-right: 5px; }
+  .ic-btn svg { width: 15px; height: 15px; vertical-align: -2px; }
+  .side-menu .el-menu-item:hover { background: rgba(255,255,255,.08); color: #fff; }
+  .side-menu .el-menu-item:hover .m-icon { stroke: #fff; }
+  .side-menu .el-menu-item.is-active { background: linear-gradient(90deg, rgba(47,111,237,.95), rgba(74,125,255,.65)); color: #fff;
+    box-shadow: 0 6px 14px rgba(47, 111, 237, .35); }
+  .side-menu .el-menu-item.is-active .m-icon { stroke: #fff; }
+  .side-foot { padding: 14px 0; text-align: center; font-size: 11px; color: rgba(255,255,255,.32); letter-spacing: 1px;
+    border-top: 1px solid rgba(255,255,255,.07); }
+  .hdr { height: 64px; display: flex; justify-content: space-between; align-items: center; padding: 0 22px;
+    background: #fff; border-bottom: 1px solid var(--line); }
+  .hdr-title { font-size: 15px; font-weight: 600; color: var(--ink); }
+  .hdr-title::before { content: ''; display: inline-block; width: 4px; height: 15px; border-radius: 2px; margin-right: 10px;
+    vertical-align: -2px; background: linear-gradient(180deg, #2f6fed, #5b8cff); }
+  .hdr-right { display: flex; align-items: center; gap: 10px; }
+  .avatar { width: 32px; height: 32px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, #2f6fed, #7a5cff); color: #fff; font-size: 14px; font-weight: 600;
+    box-shadow: 0 3px 8px rgba(47, 111, 237, .3); }
+  .hdr-user { font-size: 14px; color: var(--ink); }
+  .main { padding: 20px; overflow-y: auto; display: flex; flex-direction: column; }
 
-  /* 卡片/表格微调 */
-  .el-card { border-radius: 6px; }
-  .el-table { border-radius: 4px; }
+  /* ===== 卡片 / 表格：内容区铺满 ===== */
+  .page-card { border-radius: 10px; border: 1px solid var(--line); box-shadow: 0 2px 10px rgba(15, 31, 77, .04);
+    display: flex; flex-direction: column; flex: 1; min-height: 0; }
+  .page-card > .el-card__header { padding: 14px 18px; border-bottom: 1px solid var(--line); background: #fafbfe; border-radius: 10px 10px 0 0; flex: none; }
+  .page-card > .el-card__body { padding: 18px; display: flex; flex-direction: column; flex: 1; min-height: 0; }
+  .page-card .table-box { flex: 1; min-height: 0; position: relative; display: flex; flex-direction: column; }
+  .page-card .el-table { width: 100%; }
+  .table-empty { padding: 60px 0; display: flex; flex-direction: column; align-items: center; gap: 12px; color: #a6b1c2; }
+  .table-empty-ic { width: 56px; height: 56px; border-radius: 50%; background: #f0f4fb; display: inline-flex; align-items: center; justify-content: center; }
+  .table-empty-ic svg { width: 26px; height: 26px; stroke: #b9c4d6; }
+  .table-empty p { margin: 0; font-size: 13px; letter-spacing: 1px; }
+
+  /* ===== 系统设置页 ===== */
+  .settings-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  .settings-grid .page-card { flex: none; }
+  .settings-card { border-radius: 10px; border: 1px solid var(--line); box-shadow: 0 2px 10px rgba(15, 31, 77, .04); }
+  .settings-card > .el-card__header { padding: 12px 16px; border-bottom: 1px solid var(--line); background: #fafbfe; border-radius: 10px 10px 0 0; }
+  .settings-card > .el-card__body { padding: 16px; }
+  .settings-tip { font-size: 12px; color: var(--ink-3); line-height: 1.6; margin-top: 10px; }
+  .settings-actions { margin-top: 16px; display: flex; justify-content: flex-end; }
+  @media (max-width: 1100px) { .settings-grid { grid-template-columns: 1fr; } }
+  .card-title { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; color: var(--ink); }
+  .card-title svg { width: 17px; height: 17px; stroke: var(--brand); }
+  .el-table { border-radius: 8px; overflow: hidden;
+    --el-table-header-bg-color: #f7f9fc; --el-table-header-text-color: #5a6b82;
+    --el-table-row-hover-bg-color: #f3f7ff; --el-table-border-color: #eef1f6; }
+  .el-table th.el-table__cell { font-weight: 600; }
+  .el-tag { border-radius: 5px; }
+  .el-dialog { border-radius: 12px; }
+  .el-dialog__header { border-bottom: 1px solid var(--line); margin-right: 0; padding-bottom: 14px; }
+  .el-dialog__title { font-weight: 600; }
+  .el-message-box { border-radius: 12px; }
+
+  /* ===== 表格内头像/状态点缀 ===== */
+  .cell-user { display: flex; align-items: center; gap: 8px; }
 </style>
 </head>
 <body>
@@ -39,6 +151,7 @@
 <script src="/vendor/vue.global.prod.js"></script>
 <script src="/vendor/index.full.min.js"></script>
 <script src="/vendor/zh-cn.min.js"></script>
+<script src="/vendor/qrcode.min.js"></script>
 <script src="/js/app.js"></script>
 </body>
 </html>

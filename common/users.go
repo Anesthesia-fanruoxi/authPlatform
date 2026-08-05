@@ -31,6 +31,36 @@ func (s *UserStore) GetByUsername(ctx context.Context, username string) (*model.
 	return &u, err
 }
 
+// GetByIdentifier 按登录标识查用户：优先 username，其次 email，再 phone（均精确匹配）。
+func (s *UserStore) GetByIdentifier(ctx context.Context, identifier string) (*model.User, error) {
+	var u model.User
+	err := s.db.WithContext(ctx).
+		Where("username = ? OR email = ? OR phone = ?", identifier, identifier, identifier).
+		First(&u).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrNotFound
+	}
+	return &u, err
+}
+
+func (s *UserStore) GetByEmail(ctx context.Context, email string) (*model.User, error) {
+	var u model.User
+	err := s.db.WithContext(ctx).Where("email = ?", email).First(&u).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrNotFound
+	}
+	return &u, err
+}
+
+func (s *UserStore) GetByPhone(ctx context.Context, phone string) (*model.User, error) {
+	var u model.User
+	err := s.db.WithContext(ctx).Where("phone = ?", phone).First(&u).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrNotFound
+	}
+	return &u, err
+}
+
 func (s *UserStore) GetByID(ctx context.Context, id int64) (*model.User, error) {
 	var u model.User
 	err := s.db.WithContext(ctx).First(&u, id).Error

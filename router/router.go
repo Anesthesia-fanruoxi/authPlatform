@@ -45,10 +45,26 @@ func New(s *api.Server) http.Handler {
 
 	// 平台侧：登录校验与用户信息拉取（平台签名认证）
 	mux.HandleFunc("POST /api/auth/verify", s.Verify)
+	mux.HandleFunc("POST /api/auth/verify-step", s.VerifyStep)
+	mux.HandleFunc("POST /api/auth/send-code", s.SendCode)
 	mux.HandleFunc("POST /api/auth/change-password", s.ChangePassword)
 	mux.HandleFunc("POST /api/auth/update-profile", s.UpdateProfile)
 	mux.HandleFunc("GET /api/users/{uid}", s.GetUserByUID)
 	mux.HandleFunc("GET /api/users", s.ListUsersForPlatform)
+
+	// 管理端：系统设置
+	mux.HandleFunc("GET /api/admin/settings", adminAuth(s.Users, s.Secret, s.ListSettings))
+	mux.HandleFunc("PUT /api/admin/settings/{key}", adminAuth(s.Users, s.Secret, s.UpdateSettings))
+
+	// 管理端：黑名单管理
+	mux.HandleFunc("GET /api/admin/bans", adminAuth(s.Users, s.Secret, s.ListBans))
+	mux.HandleFunc("POST /api/admin/bans", adminAuth(s.Users, s.Secret, s.AddBan))
+	mux.HandleFunc("DELETE /api/admin/bans/{username}", adminAuth(s.Users, s.Secret, s.RemoveBan))
+
+	// 管理端：用户 TOTP 双因子
+	mux.HandleFunc("POST /api/admin/users/{id}/totp/generate", adminAuth(s.Users, s.Secret, s.GenerateTOTP))
+	mux.HandleFunc("POST /api/admin/users/{id}/totp/enable", adminAuth(s.Users, s.Secret, s.EnableTOTP))
+	mux.HandleFunc("POST /api/admin/users/{id}/totp/disable", adminAuth(s.Users, s.Secret, s.DisableTOTP))
 
 	mux.HandleFunc("/", serveWeb) // 静态页兜底（未匹配到具体路由的请求）
 

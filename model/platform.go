@@ -14,10 +14,13 @@ type Platform struct {
 	// Secret 明文盐（仅内存，不落库）
 	Secret string `gorm:"-" json:"-"`
 	// IPWhitelist JSON 数组文本，如 ["1.2.3.4"]，可空
-	IPWhitelist string    `gorm:"type:text" json:"ip_whitelist"`
-	Status      int       `gorm:"default:1" json:"status"` // 1 启用 0 停用
-	CreatedAt   time.Time `gorm:"autoCreateTime" json:"created_at"`
-	UpdatedAt   time.Time `gorm:"autoUpdateTime" json:"updated_at"`
+	IPWhitelist string `gorm:"type:text" json:"ip_whitelist"`
+	// LoginMethods 本平台登录方式（JSON 数组文本，如 ["username_password","totp"]）。
+	// 空 = 使用系统设置中的「新平台默认登录方式」。
+	LoginMethods string    `gorm:"type:text" json:"-"`
+	Status       int       `gorm:"default:1" json:"status"` // 1 启用 0 停用
+	CreatedAt    time.Time `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt    time.Time `gorm:"autoUpdateTime" json:"updated_at"`
 }
 
 func (Platform) TableName() string { return "platforms" }
