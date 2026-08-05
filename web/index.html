@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>authPlatform 管理控制台</title>
+<link rel="stylesheet" href="/vendor/index.css">
+<style>
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; background: #f0f2f5;
+    font-family: "Helvetica Neue", Helvetica, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif; }
+  #app { height: 100%; }
+
+  /* 登录页 */
+  .login-wrap { height: 100%; display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, #1f2d3d 0%, #33425b 55%, #3a6ea5 130%); }
+  .login-card { width: 380px; border-radius: 10px; box-shadow: 0 12px 40px rgba(0,0,0,.3); }
+  .login-card .el-card__header { text-align: center; font-size: 18px; letter-spacing: 1px; }
+
+  /* 布局 */
+  .layout { height: 100%; }
+  .logo { height: 60px; line-height: 60px; text-align: center; font-weight: 700; font-size: 17px;
+    color: #409eff; background: #fff; letter-spacing: 1px; border-bottom: 1px solid #e6e6e6; }
+  .el-aside { background: #fff; border-right: 1px solid #e6e6e6; }
+  .el-aside .el-menu { border-right: none; }
+  .hdr { display: flex; justify-content: flex-end; align-items: center; background: #fff;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08); color: #333; font-size: 14px; }
+  .el-main { padding: 16px; }
+
+  /* 卡片/表格微调 */
+  .el-card { border-radius: 6px; }
+  .el-table { border-radius: 4px; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<!-- 本地 vendor（内嵌进二进制，无 CDN 依赖、离线可用、无 npm 构建） -->
+<script src="/vendor/vue.global.prod.js"></script>
+<script src="/vendor/index.full.min.js"></script>
+<script src="/vendor/zh-cn.min.js"></script>
+<script src="/js/app.js"></script>
+</body>
+</html>

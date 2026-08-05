@@ -1,0 +1,12 @@
+# 构建产物
+authPlatform.exe
+authPlatform
+*.exe
+
+# 运行日志
+server.log
+*.log
+
+# IDE
+.idea/
+.vscode/
