@@ -55,10 +55,13 @@ const api = {
     return this.request('/api/admin/me/password', { method: 'POST', body: JSON.stringify({ old_password, new_password }) });
   },
   // 用户管理
-  listUsers(keyword, category) {
+  listUsers(f) {
     const qs = [];
-    if (keyword) qs.push('keyword=' + encodeURIComponent(keyword));
-    if (category) qs.push('category=' + encodeURIComponent(category));
+    if (f.keyword) qs.push('keyword=' + encodeURIComponent(f.keyword));
+    if (f.category) qs.push('category=' + encodeURIComponent(f.category));
+    if (f.has_category !== undefined && f.has_category !== '') qs.push('has_category=' + f.has_category);
+    if (f.status !== undefined && f.status !== '') qs.push('status=' + f.status);
+    if (f.totp !== undefined && f.totp !== '') qs.push('totp=' + f.totp);
     return this.request('/api/admin/users' + (qs.length ? '?' + qs.join('&') : ''));
   },
   createUser(payload) { return this.request('/api/admin/users', { method: 'POST', body: JSON.stringify(payload) }); },
@@ -140,6 +143,19 @@ const UsersPage = {
             <el-input v-model="keyword" placeholder="搜索用户名/昵称" style="width:200px;margin-right:8px" clearable @keyup.enter="load">
               <template #prefix>${svg('user', 'ipt-ic')}</template>
             </el-input>
+            <el-select v-model="statusFilter" placeholder="状态" clearable style="width:100px;margin-right:8px" @change="load">
+              <el-option label="启用" value="1" />
+              <el-option label="禁用" value="0" />
+            </el-select>
+            <el-select v-model="catFilter" placeholder="分类" clearable style="width:130px;margin-right:8px" @change="load">
+              <el-option label="已分类" value="__any" />
+              <el-option label="未分类" value="__none" />
+              <el-option v-for="c in categories" :key="c" :label="c" :value="c" />
+            </el-select>
+            <el-select v-model="totpFilter" placeholder="双因子" clearable style="width:110px;margin-right:8px" @change="load">
+              <el-option label="已启用" value="1" />
+              <el-option label="未启用" value="0" />
+            </el-select>
             <el-button type="primary" @click="openCreate">新建用户</el-button>
             <el-button type="warning" plain :disabled="!selectedIds.length" @click="openBatchCategory">批量分类{{ selectedIds.length ? '（' + selectedIds.length + '）' : '' }}</el-button>
           </div>
@@ -256,6 +272,9 @@ const UsersPage = {
   setup() {
     const users = ref([]);
     const keyword = ref('');
+    const statusFilter = ref('');
+    const catFilter = ref('');
+    const totpFilter = ref('');
     const categories = ref([]);
     const loading = ref(false);
     const { tableHeight, boxRef } = useTableFill();
@@ -282,7 +301,15 @@ const UsersPage = {
     async function load() {
       loading.value = true;
       try {
-        const data = await api.listUsers(keyword.value);
+        const f = {
+          keyword: keyword.value,
+          status: statusFilter.value,
+          totp: totpFilter.value,
+        };
+        if (catFilter.value === '__any') f.has_category = '1';
+        else if (catFilter.value === '__none') f.has_category = '0';
+        else f.category = catFilter.value;
+        const data = await api.listUsers(f);
         users.value = data.users || [];
       } catch (e) { ElMessage.error(e.message); }
       finally { loading.value = false; }
@@ -368,7 +395,7 @@ const UsersPage = {
       } catch (e) { ElMessage.error(e.message); }
     }
 
-    return { users, keyword, categories, loading, tableHeight, boxRef, dlg, pwdDlg, catDlg, selectedIds, avatarStyle, load, openCreate, openEdit, save, toggleStatus, openReset, savePwd, del, onSelectionChange, openBatchCategory, doBatchCategory };
+    return { users, keyword, statusFilter, catFilter, totpFilter, categories, loading, tableHeight, boxRef, dlg, pwdDlg, catDlg, selectedIds, avatarStyle, load, openCreate, openEdit, save, toggleStatus, openReset, savePwd, del, onSelectionChange, openBatchCategory, doBatchCategory };
   },
 };
 

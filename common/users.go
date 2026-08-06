@@ -96,19 +96,42 @@ func (s *UserStore) ListByIDs(ctx context.Context, ids []int64, keyword string) 
 	return users, nil
 }
 
-// List 按条件返回用户列表：keyword 模糊匹配用户名/昵称；
-// excludeAdmins=true 时排除超级管理员；category 非空时按分类过滤。按 id 升序。
-func (s *UserStore) List(ctx context.Context, keyword string, excludeAdmins bool, category string) ([]*model.User, error) {
+// UserFilter 用户列表筛选条件。
+type UserFilter struct {
+	Keyword      string // 模糊匹配用户名/昵称
+	ExcludeAdmin bool   // 排除超级管理员
+	Category     string // 精确分类（非空时生效）
+	HasCategory  *bool  // 已分类(true)/未分类(false)，与 Category 互斥
+	Status       *int   // 启用(1)/禁用(0)
+	TOTPEnabled  *bool  // 双因子启用(true)/未启用(false)
+}
+
+// List 按条件返回用户列表（keyword 模糊匹配用户名/昵称；excludeAdmins 排除超级管理员；
+// category 精确分类；hasCategory 已分类/未分类；status 启用/禁用；totpEnabled 双因子状态）。按 id 升序。
+func (s *UserStore) List(ctx context.Context, f UserFilter) ([]*model.User, error) {
 	q := s.db.WithContext(ctx).Model(&model.User{})
-	if keyword != "" {
-		like := "%" + keyword + "%"
+	if f.Keyword != "" {
+		like := "%" + f.Keyword + "%"
 		q = q.Where("username LIKE ? OR nickname LIKE ?", like, like)
 	}
-	if excludeAdmins {
+	if f.ExcludeAdmin {
 		q = q.Where("is_admin = ?", false)
 	}
-	if category != "" {
-		q = q.Where("category = ?", category)
+	if f.Category != "" {
+		q = q.Where("category = ?", f.Category)
+	}
+	if f.HasCategory != nil {
+		if *f.HasCategory {
+			q = q.Where("category <> ''")
+		} else {
+			q = q.Where("category = ''")
+		}
+	}
+	if f.Status != nil {
+		q = q.Where("status = ?", *f.Status)
+	}
+	if f.TOTPEnabled != nil {
+		q = q.Where("totp_enabled = ?", *f.TOTPEnabled)
 	}
 	var users []*model.User
 	if err := q.Order("id ASC").Find(&users).Error; err != nil {

@@ -37,10 +37,30 @@ func (s *Server) BatchSetCategory(w http.ResponseWriter, r *http.Request) {
 	OK(w, nil)
 }
 
-// ListUsers 用户列表（超级管理员不展示；支持 keyword / category 筛选）。
+// ListUsers 用户列表（超级管理员不展示；支持 keyword/category/status/totp/has_category 筛选）。
 func (s *Server) ListUsers(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
-	users, err := s.Users.List(r.Context(), q.Get("keyword"), true, q.Get("category"))
+	f := common.UserFilter{
+		Keyword:      q.Get("keyword"),
+		ExcludeAdmin: true,
+		Category:     q.Get("category"),
+	}
+	if v := q.Get("status"); v == "0" || v == "1" {
+		n := 0
+		if v == "1" {
+			n = 1
+		}
+		f.Status = &n
+	}
+	if v := q.Get("totp"); v == "0" || v == "1" {
+		b := v == "1"
+		f.TOTPEnabled = &b
+	}
+	if v := q.Get("has_category"); v == "0" || v == "1" {
+		b := v == "1"
+		f.HasCategory = &b
+	}
+	users, err := s.Users.List(r.Context(), f)
 	if err != nil {
 		s.internalError(w, err)
 		return
