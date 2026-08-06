@@ -14,3 +14,4 @@ server.log
 # 本地工具配置与元数据
 .reasonix/
 reasonix.toml
+*.exe~
