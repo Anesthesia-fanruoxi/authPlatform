@@ -11,13 +11,15 @@
 
 ```sql
 SELECT
-  user_name            AS username,        -- -> authplatform.users.username
-  nick_name            AS nickname,        -- -> authplatform.users.nickname
-  phone                AS phone,           -- 空值导入时转 NULL（唯一索引防空串冲突）
-  email                AS email,           -- 同上
-  is_enabled           AS status,          -- 1=启用 0=禁用 -> users.status
-  otp_secret           AS totp_secret,     -- base32 明文，两表格式一致 -> users.totp_secret
-  otp_enabled          AS totp_enabled,    -- 1/0 -> users.totp_enabled
+  id                   AS src_id,           -- CMDB 用户 id（仅作核对参考，不迁移）
+  user_name            AS username,         -- -> authplatform.users.username
+  nick_name            AS nickname,         -- -> authplatform.users.nickname
+  phone                AS phone,            -- 空值导入时转 NULL（唯一索引防空串冲突）
+  email                AS email,            -- 同上
+  is_enabled           AS status,           -- 1=启用 0=禁用 -> users.status
+  otp_secret           AS totp_secret,      -- base32 明文，两表格式一致 -> users.totp_secret
+  otp_enabled          AS totp_enabled,     -- 1/0 -> users.totp_enabled
+  otp_setup_completed,                      -- 参考列（totp_enabled 已隐含，不迁移）
   otp_backup_codes     AS otp_backup_codes_json, -- JSON 数组原文，导入后展开到 otp_backup_codes 表
   created_at,
   updated_at
