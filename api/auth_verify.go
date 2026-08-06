@@ -75,7 +75,7 @@ func (s *Server) Verify(w http.ResponseWriter, r *http.Request) {
 	// 定位用户（按第一步方式）
 	var u *model.User
 	switch method {
-	case common.LoginMethodUsernamePassword:
+	case common.LoginMethodUsernamePassword, common.LoginMethodUsernameTOTP:
 		u, err = s.Users.GetByUsername(r.Context(), identifier)
 	case common.LoginMethodEmailPassword:
 		u, err = s.Users.GetByEmail(r.Context(), identifier)
@@ -352,7 +352,7 @@ func (s *Server) verifyCredential(ctx context.Context, u *model.User, method, id
 			return false, "bad_code", "验证码错误或已过期"
 		}
 		return true, "", ""
-	case common.LoginMethodTOTP:
+	case common.LoginMethodTOTP, common.LoginMethodUsernameTOTP:
 		if !u.TOTPEnabled || u.TOTPSecret == "" {
 			return false, "totp_disabled", "该用户未启用 TOTP 双因子验证"
 		}

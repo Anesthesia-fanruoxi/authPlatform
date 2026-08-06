@@ -24,7 +24,8 @@ const LOGIN_METHOD_OPTIONS = [
   { value: 'username_password', label: '用户名 + 密码' },
   { value: 'email_password', label: '邮箱 + 密码' },
   { value: 'phone_code', label: '手机号 + 验证码' },
-  { value: 'totp', label: 'TOTP 双因子验证' },
+  { value: 'username_totp', label: '用户名 + TOTP 验证码（无密码）' },
+  { value: 'totp', label: 'TOTP 双因子验证（第二因子）' },
 ];
 function loginMethodLabel(m) {
   const found = LOGIN_METHOD_OPTIONS.find(o => o.value === m);

@@ -16,7 +16,8 @@ const (
 	LoginMethodUsernamePassword = "username_password" // 用户名 + 密码
 	LoginMethodEmailPassword    = "email_password"    // 邮箱 + 密码
 	LoginMethodPhoneCode        = "phone_code"        // 手机号 + 验证码
-	LoginMethodTOTP             = "totp"              // TOTP 双因子验证码
+	LoginMethodTOTP             = "totp"              // TOTP 双因子验证码（可作第二因子）
+	LoginMethodUsernameTOTP     = "username_totp"     // 用户名 + TOTP 验证码（无密码登录，完整登录方式）
 	LoginMethodEmailCode        = "email_code"        // 邮箱验证码（发码预留，可作第二因子）
 )
 
@@ -213,7 +214,7 @@ func (s *SettingsStore) All(ctx context.Context) (map[string]any, error) {
 
 // AllLoginMethods 全部允许的登录方式（顺序即建议展示顺序）。
 func AllLoginMethods() []string {
-	return []string{LoginMethodUsernamePassword, LoginMethodEmailPassword, LoginMethodPhoneCode, LoginMethodTOTP}
+	return []string{LoginMethodUsernamePassword, LoginMethodEmailPassword, LoginMethodPhoneCode, LoginMethodUsernameTOTP, LoginMethodTOTP}
 }
 
 // ValidateLoginMethods 校验登录方式列表合法性：
@@ -243,6 +244,14 @@ func ValidateLoginMethods(methods []string) ([]string, error) {
 	}
 	if len(methods) == 1 && methods[0] == LoginMethodTOTP {
 		return nil, errors.New("TOTP 双因子不能单独作为登录方式，请至少再选择一种")
+	}
+	// username_totp 本身已是完整登录方式（用户名 + TOTP），不能再与其他方式组合
+	if len(methods) > 1 {
+		for _, m := range methods {
+			if m == LoginMethodUsernameTOTP {
+				return nil, errors.New("username_totp 已包含完整验证（用户名+TOTP），不能与其他登录方式组合")
+			}
+		}
 	}
 	return methods, nil
 }

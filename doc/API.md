@@ -106,9 +106,11 @@ print(r)
 }
 ```
 
-- `method` 可选值：`username_password`（identifier=用户名）、`email_password`（identifier=邮箱）、`phone_code`（identifier=手机号，配合 send-code）。
+- `method` 可选值：`username_password`（identifier=用户名）、`email_password`（identifier=邮箱）、`phone_code`（identifier=手机号，配合 send-code）、`username_totp`（identifier=用户名 + TOTP 动态码，**无密码登录**，完整单步方式）。
 - **兼容旧格式**：只传 `{username, password, platform_id}` 时等价于 `username_password`。
 - 必须与平台生效的**第一个**登录方式一致（平台自定义 `login_methods` 优先，否则系统默认模板）。
+- `username_totp` 为完整登录方式，**只能单独配置**（不能与其他方式组合）；用户须先绑定 TOTP（平台侧 `POST /api/auth/totp/save` 上报密钥）才能使用，未绑定返回 1003「该用户未启用 TOTP 双因子验证」。
+- CMDB 用户迁移（无密码、仅双因子登录）：查询/插入 SQL 见 `doc/MIGRATION.md`。
 
 **响应 A — 单步完成（平台只有一种登录方式）：**
 
