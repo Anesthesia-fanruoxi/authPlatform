@@ -70,8 +70,8 @@ const api = {
     return this.request('/api/admin/users/batch-category', { method: 'POST', body: JSON.stringify({ user_ids, category }) });
   },
   deleteUser(id) { return this.request('/api/admin/users/' + id, { method: 'DELETE' }); },
-  resetPassword(id, new_password) {
-    return this.request('/api/admin/users/' + id + '/reset-password', { method: 'POST', body: JSON.stringify({ new_password }) });
+  resetPassword(id) {
+    return this.request('/api/admin/users/' + id + '/reset-password', { method: 'POST', body: JSON.stringify({}) });
   },
   // 平台管理
   listPlatforms() { return this.request('/api/admin/platforms'); },
@@ -255,17 +255,13 @@ const UsersPage = {
       </template>
     </el-dialog>
 
-    <el-dialog v-model="pwdDlg.visible" title="重置密码" width="400" align-center>
-      <el-form label-width="80px">
-        <el-form-item label="账号">{{ pwdDlg.username }}</el-form-item>
-        <el-form-item label="新密码">
-          <el-input v-model="pwdDlg.password" type="password" show-password placeholder="至少8位，含字母和数字" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="pwdDlg.visible = false">取消</el-button>
-        <el-button type="primary" :loading="pwdDlg.saving" @click="savePwd">确定</el-button>
-      </template>
+    <el-dialog v-model="pwdDlg.visible" title="重置密码" width="440" align-center>
+      <el-alert type="success" :closable="false" show-icon style="margin-bottom:12px"
+        title="已为「{{ pwdDlg.username }}」自动生成符合密码策略的新密码（仅显示一次，请复制后告知用户）。" />
+      <el-input :model-value="pwdDlg.password" readonly>
+        <template #append><el-button @click="copyPwd">复制</el-button></template>
+      </el-input>
+      <template #footer><el-button type="primary" @click="pwdDlg.visible = false">关闭</el-button></template>
     </el-dialog>
 
   `,
@@ -279,7 +275,7 @@ const UsersPage = {
     const loading = ref(false);
     const { tableHeight, boxRef } = useTableFill();
     const dlg = reactive({ visible: false, isEdit: false, saving: false, form: { id: 0, username: '', nickname: '', category: '', phone: '', email: '', password: '' } });
-    const pwdDlg = reactive({ visible: false, saving: false, id: 0, username: '', password: '' });
+    const pwdDlg = reactive({ visible: false, username: '', password: '' });
     const catDlg = reactive({ visible: false, saving: false, category: '' });
     const selectedIds = ref([]);
 
@@ -349,20 +345,19 @@ const UsersPage = {
         load();
       } catch (e) { ElMessage.error(e.message); }
     }
-    function openReset(row) {
-      pwdDlg.id = row.id;
-      pwdDlg.username = row.username;
-      pwdDlg.password = '';
-      pwdDlg.visible = true;
-    }
-    async function savePwd() {
-      pwdDlg.saving = true;
+    async function openReset(row) {
       try {
-        await api.resetPassword(pwdDlg.id, pwdDlg.password);
-        ElMessage.success('密码已重置');
-        pwdDlg.visible = false;
+        await ElMessageBox.confirm(`将为「${row.username}」自动生成符合密码策略的新密码，确定重置？`, '重置密码', { type: 'warning' });
+      } catch { return; }
+      try {
+        const data = await api.resetPassword(row.id);
+        pwdDlg.username = row.username;
+        pwdDlg.password = data.password || '';
+        pwdDlg.visible = true;
       } catch (e) { ElMessage.error(e.message); }
-      finally { pwdDlg.saving = false; }
+    }
+    function copyPwd() {
+      navigator.clipboard.writeText(pwdDlg.password || '').then(() => ElMessage.success('已复制')).catch(() => ElMessage.warning('复制失败，请手动复制'));
     }
     function onSelectionChange(rows) {
       selectedIds.value = rows.map(r => r.id);
@@ -395,7 +390,7 @@ const UsersPage = {
       } catch (e) { ElMessage.error(e.message); }
     }
 
-    return { users, keyword, statusFilter, catFilter, totpFilter, categories, loading, tableHeight, boxRef, dlg, pwdDlg, catDlg, selectedIds, avatarStyle, load, openCreate, openEdit, save, toggleStatus, openReset, savePwd, del, onSelectionChange, openBatchCategory, doBatchCategory };
+    return { users, keyword, statusFilter, catFilter, totpFilter, categories, loading, tableHeight, boxRef, dlg, pwdDlg, catDlg, selectedIds, avatarStyle, load, openCreate, openEdit, save, toggleStatus, openReset, copyPwd, del, onSelectionChange, openBatchCategory, doBatchCategory };
   },
 };
 

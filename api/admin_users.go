@@ -213,21 +213,38 @@ func (s *Server) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		NewPassword string `json:"new_password"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.NewPassword == "" {
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		Fail(w, CodeBadParam, "参数错误")
 		return
 	}
-	if err := common.ValidatePassword(req.NewPassword); err != nil {
-		Fail(w, CodeBadParam, err.Error())
-		return
+	policy := s.Settings.GetPasswordPolicy(r.Context())
+	var password string
+	if req.NewPassword == "" {
+		// 自动生成符合策略的随机密码
+		password, err = common.GeneratePassword(policy)
+		if err != nil {
+			s.internalError(w, err)
+			return
+		}
+	} else {
+		password = req.NewPassword
+		if err := common.ValidatePasswordWithPolicy(password, policy); err != nil {
+			Fail(w, CodeBadParam, err.Error())
+			return
+		}
 	}
-	hash, err := common.HashPassword(req.NewPassword)
+	hash, err := common.HashPassword(password)
 	if err != nil {
 		s.internalError(w, err)
 		return
 	}
 	if err := s.Users.Update(r.Context(), id, map[string]any{"password_hash": hash}); err != nil {
 		s.internalError(w, err)
+		return
+	}
+	if req.NewPassword == "" {
+		// 生成的密码仅此一次返回
+		OK(w, map[string]any{"password": password})
 		return
 	}
 	OK(w, nil)
