@@ -5,6 +5,7 @@ import (
 
 	"authplatform/model"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type GrantStore struct {
@@ -31,20 +32,25 @@ func (s *GrantStore) SetForUser(ctx context.Context, userID int64, platformIDs [
 	})
 }
 
-// SetForPlatform 全量替换某平台可登录的用户集合（事务：先清后插）。
-func (s *GrantStore) SetForPlatform(ctx context.Context, platformID int64, userIDs []int64) error {
+// GrantUsers 批量给平台添加授权用户（已授权则跳过，不影响其他用户）。
+func (s *GrantStore) GrantUsers(ctx context.Context, platformID int64, userIDs []int64) error {
 	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("platform_id = ?", platformID).Delete(&model.UserPlatformGrant{}).Error; err != nil {
-			return err
-		}
 		for _, uid := range userIDs {
 			g := &model.UserPlatformGrant{UserID: uid, PlatformID: platformID, Status: 1}
-			if err := tx.Create(g).Error; err != nil {
+			if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(g).Error; err != nil {
 				return err
 			}
 		}
 		return nil
 	})
+}
+
+// RevokeUsers 批量移除平台的授权用户（只移除指定用户，不影响其他用户）。
+func (s *GrantStore) RevokeUsers(ctx context.Context, platformID int64, userIDs []int64) error {
+	if len(userIDs) == 0 {
+		return nil
+	}
+	return s.db.WithContext(ctx).Where("platform_id = ? AND user_id IN ?", platformID, userIDs).Delete(&model.UserPlatformGrant{}).Error
 }
 
 func (s *GrantStore) GetByUser(ctx context.Context, userID int64) ([]*model.UserPlatformGrant, error) {

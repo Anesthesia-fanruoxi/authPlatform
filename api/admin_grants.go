@@ -8,7 +8,8 @@ import (
 )
 
 // SetPlatformGrants POST /api/admin/platforms/{id}/grants
-// 全量替换某平台可登录的用户集合（列级批量授权）。
+// 列级批量授权：{action: "grant"|"revoke", user_ids: [...]}。
+// grant 只添加授权（已授权跳过），revoke 只移除指定用户授权——均不影响其他用户。
 func (s *Server) SetPlatformGrants(w http.ResponseWriter, r *http.Request) {
 	id, err := pathID(r)
 	if err != nil {
@@ -16,10 +17,11 @@ func (s *Server) SetPlatformGrants(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
+		Action  string  `json:"action"`
 		UserIDs []int64 `json:"user_ids"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		Fail(w, CodeBadParam, "参数错误")
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || (req.Action != "grant" && req.Action != "revoke") {
+		Fail(w, CodeBadParam, "参数错误（action 需为 grant 或 revoke）")
 		return
 	}
 	for _, uid := range req.UserIDs {
@@ -32,7 +34,12 @@ func (s *Server) SetPlatformGrants(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if err := s.Grants.SetForPlatform(r.Context(), id, req.UserIDs); err != nil {
+	if req.Action == "grant" {
+		err = s.Grants.GrantUsers(r.Context(), id, req.UserIDs)
+	} else {
+		err = s.Grants.RevokeUsers(r.Context(), id, req.UserIDs)
+	}
+	if err != nil {
 		s.internalError(w, err)
 		return
 	}

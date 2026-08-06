@@ -80,8 +80,8 @@ const api = {
   setUserGrants(id, platform_ids) {
     return this.request('/api/admin/users/' + id + '/grants', { method: 'POST', body: JSON.stringify({ platform_ids }) });
   },
-  setPlatformGrants(id, user_ids) {
-    return this.request('/api/admin/platforms/' + id + '/grants', { method: 'POST', body: JSON.stringify({ user_ids }) });
+  setPlatformGrants(id, user_ids, action) {
+    return this.request('/api/admin/platforms/' + id + '/grants', { method: 'POST', body: JSON.stringify({ action, user_ids }) });
   },
   // 审计日志
   listLogs(params) {
@@ -690,8 +690,8 @@ const GrantsPage = {
         );
       } catch { return; }
       try {
-        await api.setPlatformGrants(p.id, val ? ids : []);
-        ElMessage.success(val ? `已授权「${p.name}」给 ${users.length} 个用户` : `已清空「${p.name}」的授权用户`);
+        await api.setPlatformGrants(p.id, ids, val ? 'grant' : 'revoke');
+        ElMessage.success(val ? `已授权「${p.name}」给 ${users.length} 个用户` : `已移除「${p.name}」对 ${users.length} 个用户的授权`);
         load();
       } catch (e) { ElMessage.error(e.message); }
     }

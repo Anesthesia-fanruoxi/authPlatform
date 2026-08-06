@@ -225,6 +225,7 @@ print(r)
 | POST | `/api/admin/users/{id}/reset-password` | 重置密码 `{new_password}` |
 | GET | `/api/admin/grants?category=` | 授权矩阵数据（用户×平台，不含超管，支持分类筛选） |
 | POST | `/api/admin/users/{id}/grants` | 全量设置用户可登录平台 `{platform_ids: [1,2]}` |
+| POST | `/api/admin/platforms/{id}/grants` | 列级批量授权 `{action: "grant"\|"revoke", user_ids: [...]}`（只增/只删指定用户，不影响其他用户授权） |
 | GET/PUT | `/api/admin/platforms`、`/api/admin/platforms/{id}` | 平台管理（创建时返回一次明文 secret） |
 | POST | `/api/admin/platforms/{id}/rotate-secret` | 密钥轮换（双盐过渡，第二次轮换吊销旧盐） |
 | GET | `/api/admin/logs?username=&platform_id=&success=&limit=` | 审计日志 |
