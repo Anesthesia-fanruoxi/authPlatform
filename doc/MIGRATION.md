@@ -65,11 +65,15 @@ FROM (
          1 AS status, NULL AS totp_secret, 0 AS totp_enabled,
          CAST(NULL AS CHAR) AS otp_backup_codes_json, NOW(), NOW()
 ) tmp
-LEFT JOIN authplatform.users u ON u.username = tmp.username
+LEFT JOIN authplatform.users u ON u.username = tmp.username COLLATE utf8mb4_general_ci
 WHERE u.id IS NULL;
 ```
 
 > 实际使用：把第 1 节导出结果导入一张临时表（或按上述 `UNION ALL` 行拼接），再执行本 INSERT。
+>
+> **⚠️ collation 冲突**：CMDB 表为 `utf8mb4_0900_ai_ci`，authPlatform 为 `utf8mb4_general_ci`，
+> JOIN 比较用户名时必须显式指定 collation（下方 SQL 已加 `COLLATE utf8mb4_general_ci`）；
+> 建临时表导入数据时建议一并指定 `COLLATE utf8mb4_general_ci` 或 `CONVERT TO CHARACTER SET utf8mb4`。
 
 ## 3. 恢复码迁移（otp_backup_codes 表，MySQL 8+ JSON_TABLE）
 
@@ -82,7 +86,7 @@ FROM (
   -- 与第 2 节同一份临时数据（含 otp_backup_codes_json）
   SELECT 'alice' AS username, '["123456","654321"]' AS otp_backup_codes_json, NOW() AS updated_at
 ) tmp
-JOIN authplatform.users u ON u.username = tmp.username
+JOIN authplatform.users u ON u.username = tmp.username COLLATE utf8mb4_general_ci
 JOIN JSON_TABLE(
   IFNULL(NULLIF(tmp.otp_backup_codes_json, ''), '[]'),
   '$[*]' COLUMNS (code VARCHAR(16) PATH '$')
