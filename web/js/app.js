@@ -256,8 +256,9 @@ const UsersPage = {
     </el-dialog>
 
     <el-dialog v-model="pwdDlg.visible" title="重置密码" width="440" align-center>
-      <el-alert type="success" :closable="false" show-icon style="margin-bottom:12px"
-        title="已为「{{ pwdDlg.username }}」自动生成符合密码策略的新密码（仅显示一次，请复制后告知用户）。" />
+      <el-alert type="success" :closable="false" show-icon style="margin-bottom:12px">
+        已为「{{ pwdDlg.username }}」自动生成符合密码策略的新密码（仅显示一次，请复制后告知用户）。
+      </el-alert>
       <el-input :model-value="pwdDlg.password" readonly>
         <template #append><el-button @click="copyPwd">复制</el-button></template>
       </el-input>
