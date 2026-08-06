@@ -220,11 +220,12 @@ print(r)
 | --- | --- | --- |
 | GET | `/api/admin/me` | 当前登录管理员信息 |
 | POST | `/api/admin/me/password` | 修改自己的密码（校验原密码） |
-| GET | `/api/admin/users?keyword=&category=` | 用户列表（不含超管；支持关键字/分类筛选） |
+| GET | `/api/admin/users?keyword=&category=&status=&totp=&has_category=` | 用户列表（不含超管；keyword 关键字、category 精确分类、status 1/0、totp 1/0、has_category 1=已分类 0=未分类，可组合） |
 | POST | `/api/admin/users` | 创建用户 `{username, password, nickname, phone, email, category}` |
 | PUT | `/api/admin/users/{id}` | 更新 `{nickname, phone, email, status, category}` |
 | DELETE | `/api/admin/users/{id}` | 删除用户 |
-| POST | `/api/admin/users/{id}/reset-password` | 重置密码 `{new_password}` |
+| POST | `/api/admin/users/{id}/reset-password` | 重置密码：不传 `new_password` 时**自动生成**符合密码策略的随机密码并一次性返回 `{password}`；传 `new_password` 则按策略校验后更新 |
+| POST | `/api/admin/users/batch-category` | 批量设置用户分类 `{user_ids: [1,2], category: "开发"}`（category 空串=清除分类） |
 | GET | `/api/admin/grants?category=` | 授权矩阵数据（用户×平台，不含超管，支持分类筛选） |
 | POST | `/api/admin/users/{id}/grants` | 全量设置用户可登录平台 `{platform_ids: [1,2]}` |
 | POST | `/api/admin/platforms/{id}/grants` | 列级批量授权 `{action: "grant"\|"revoke", user_ids: [...]}`（只增/只删指定用户，不影响其他用户授权） |
@@ -233,7 +234,7 @@ print(r)
 | GET | `/api/admin/logs?username=&platform_id=&success=&limit=` | 审计日志 |
 | GET/PUT | `/api/admin/settings`、`/api/admin/settings/{key}` | 系统设置（含 `user_categories` 用户分类列表 `{items:[...]}`） |
 
-**用户分类**：分类（开发/测试/运营/风控/数分等）由管理员在系统设置维护（可自定义增删），用于用户管理标识与授权管理按分类筛选（快捷授权）；分类归属是认证中心存储的用户属性，权限/部门/角色等业务数据仍由各平台自行维护。
+**用户分类**：分类（开发/测试/运营/风控/数分等）由管理员在系统设置维护（可自定义增删），用于用户管理标识、多选批量分类与授权管理按分类筛选（快捷授权）；分类归属是认证中心存储的用户属性，权限/部门/角色等业务数据仍由各平台自行维护。
 
 ---
 
@@ -247,6 +248,11 @@ if r["code"] == 0 and "token" in r["data"]:
     token = r["data"]["token"]          # 平台自行保存 token，自行管理生命周期（不吊销）
 else:
     print("登录失败:", r["msg"])
+
+# 无密码登录：用户名 + TOTP 动态码（平台配置 login_methods=["username_totp"]）
+r = signed_request("POST", "/api/auth/verify",
+    {"method": "username_totp", "identifier": "alice", "credential": "6 位动态码"})
+# -> code=0 发 token；未绑定 TOTP 返回 1003「该用户未启用 TOTP 双因子验证」
 
 # 两步登录（username_password + totp）
 r1 = signed_request("POST", "/api/auth/verify",
