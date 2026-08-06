@@ -257,7 +257,7 @@ const UsersPage = {
 
     <el-dialog v-model="pwdDlg.visible" title="重置密码" width="440" align-center>
       <el-alert type="success" :closable="false" show-icon style="margin-bottom:12px">
-        已为「{{ pwdDlg.username }}」自动生成符合密码策略的新密码（仅显示一次，请复制后告知用户）。
+        已为「{{ pwdDlg.username }}」自动生成新密码并复制到剪贴板，弹窗 3 秒后自动关闭。
       </el-alert>
       <el-input :model-value="pwdDlg.password" readonly>
         <template #append><el-button @click="copyPwd">复制</el-button></template>
@@ -277,6 +277,23 @@ const UsersPage = {
     const { tableHeight, boxRef } = useTableFill();
     const dlg = reactive({ visible: false, isEdit: false, saving: false, form: { id: 0, username: '', nickname: '', category: '', phone: '', email: '', password: '' } });
     const pwdDlg = reactive({ visible: false, username: '', password: '' });
+    let pwdTimer = null;
+    function copyToClipboard(text) {
+      const ok = () => ElMessage.success('新密码已自动复制');
+      const fallback = () => {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand('copy'); ok(); } catch { /* ignore */ }
+        document.body.removeChild(ta);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(ok).catch(fallback);
+      } else {
+        fallback();
+      }
+    }
     const catDlg = reactive({ visible: false, saving: false, category: '' });
     const selectedIds = ref([]);
 
@@ -355,10 +372,13 @@ const UsersPage = {
         pwdDlg.username = row.username;
         pwdDlg.password = data.password || '';
         pwdDlg.visible = true;
+        copyToClipboard(pwdDlg.password);
+        clearTimeout(pwdTimer);
+        pwdTimer = setTimeout(() => { pwdDlg.visible = false; }, 3000);
       } catch (e) { ElMessage.error(e.message); }
     }
     function copyPwd() {
-      navigator.clipboard.writeText(pwdDlg.password || '').then(() => ElMessage.success('已复制')).catch(() => ElMessage.warning('复制失败，请手动复制'));
+      copyToClipboard(pwdDlg.password || '');
     }
     function onSelectionChange(rows) {
       selectedIds.value = rows.map(r => r.id);
