@@ -84,12 +84,6 @@ const api = {
   updateSettings(key, payload) {
     return this.request('/api/admin/settings/' + key, { method: 'PUT', body: JSON.stringify(payload) });
   },
-  // 用户 TOTP 双因子
-  generateTotp(id) { return this.request('/api/admin/users/' + id + '/totp/generate', { method: 'POST' }); },
-  enableTotp(id, code) {
-    return this.request('/api/admin/users/' + id + '/totp/enable', { method: 'POST', body: JSON.stringify({ code }) });
-  },
-  disableTotp(id) { return this.request('/api/admin/users/' + id + '/totp/disable', { method: 'POST' }); },
   // 黑名单管理
   listBans() { return this.request('/api/admin/bans'); },
   addBan(payload) { return this.request('/api/admin/bans', { method: 'POST', body: JSON.stringify(payload) }); },
@@ -168,11 +162,10 @@ const UsersPage = {
             <span v-else style="color:#8a97ab">普通</span>
           </template>
         </el-table-column>
-        <el-table-column label="双因子" width="120" align="center">
+        <el-table-column label="双因子" width="100" align="center">
           <template #default="{row}">
             <el-tag v-if="row.totp_enabled" type="success" effect="light" round>已启用</el-tag>
-            <el-button v-else link type="primary" @click="openTotp(row)">绑定</el-button>
-            <el-button v-if="row.totp_enabled" link type="danger" style="margin-left:6px" @click="unbindTotp(row)">解绑</el-button>
+            <span v-else style="color:#8a97ab">未启用</span>
           </template>
         </el-table-column>
         <el-table-column prop="created_at" label="创建时间" width="190" />
@@ -225,32 +218,6 @@ const UsersPage = {
       </template>
     </el-dialog>
 
-    <el-dialog v-model="totpDlg.visible" :title="'TOTP 双因子绑定 — ' + totpDlg.username" width="560" align-center>
-      <el-alert type="info" :closable="false" show-icon style="margin-bottom:14px;border-radius:8px"
-        title="使用 Authenticator 应用（Google Authenticator / Microsoft Authenticator 等）扫描二维码或手动输入密钥" />
-      <div style="display:flex;gap:20px;align-items:flex-start">
-        <div ref="qrcodeBox" style="width:180px;height:180px;background:#fff;border:1px solid var(--line);border-radius:8px;display:flex;align-items:center;justify-content:center;flex:none"></div>
-        <div style="flex:1;display:flex;flex-direction:column;gap:10px;min-width:0">
-          <div>
-            <div class="settings-tip" style="margin-top:0">密钥（Secret）</div>
-            <el-input :model-value="totpDlg.secret" readonly size="small">
-              <template #append><el-button @click="copyText(totpDlg.secret)">复制</el-button></template>
-            </el-input>
-          </div>
-          <div>
-            <div class="settings-tip" style="margin-top:0">otpauth URI</div>
-            <el-input :model-value="totpDlg.uri" readonly size="small" />
-          </div>
-        </div>
-      </div>
-      <el-form label-width="80px" style="margin-top:16px">
-        <el-form-item label="验证码">
-          <el-input v-model="totpDlg.code" placeholder="输入 App 中的 6 位验证码" style="width:220px" @keyup.enter="bindTotp" />
-          <el-button type="primary" style="margin-left:10px" :loading="totpDlg.saving" @click="bindTotp">启用绑定</el-button>
-        </el-form-item>
-      </el-form>
-      <template #footer><el-button @click="totpDlg.visible = false">关闭</el-button></template>
-    </el-dialog>
   `,
   setup() {
     const users = ref([]);
@@ -259,8 +226,6 @@ const UsersPage = {
     const { tableHeight, boxRef } = useTableFill();
     const dlg = reactive({ visible: false, isEdit: false, saving: false, form: { id: 0, username: '', nickname: '', phone: '', email: '', password: '' } });
     const pwdDlg = reactive({ visible: false, saving: false, id: 0, username: '', password: '' });
-    const totpDlg = reactive({ visible: false, saving: false, userId: 0, username: '', secret: '', uri: '', code: '' });
-    const qrcodeBox = ref(null);
 
     const avatarPalette = ['#2f6fed', '#7a5cff', '#0ea5a4', '#e07a3f', '#d64f8c', '#3f9e4d'];
     function avatarStyle(row) {
@@ -338,50 +303,7 @@ const UsersPage = {
       } catch (e) { ElMessage.error(e.message); }
     }
 
-    async function openTotp(row) {
-      totpDlg.userId = row.id;
-      totpDlg.username = row.username;
-      totpDlg.code = '';
-      try {
-        const data = await api.generateTotp(row.id);
-        totpDlg.secret = data.secret;
-        totpDlg.uri = data.uri;
-        totpDlg.visible = true;
-        setTimeout(renderQrcode, 60);
-      } catch (e) { ElMessage.error(e.message); }
-    }
-    function renderQrcode() {
-      const box = qrcodeBox.value;
-      if (!box || !totpDlg.uri || typeof QRCode === 'undefined') return;
-      box.innerHTML = '';
-      new QRCode(box, { text: totpDlg.uri, width: 170, height: 170, correctLevel: QRCode.CorrectLevel.M });
-    }
-    async function bindTotp() {
-      if (!totpDlg.code) { ElMessage.warning('请输入验证码'); return; }
-      totpDlg.saving = true;
-      try {
-        await api.enableTotp(totpDlg.userId, totpDlg.code);
-        ElMessage.success('TOTP 双因子已启用');
-        totpDlg.visible = false;
-        load();
-      } catch (e) { ElMessage.error(e.message); }
-      finally { totpDlg.saving = false; }
-    }
-    async function unbindTotp(row) {
-      try {
-        await ElMessageBox.confirm(`确定解绑「${row.username}」的 TOTP 双因子？解绑后该用户登录将不再需要 TOTP 验证码。`, '提示', { type: 'warning' });
-      } catch { return; }
-      try {
-        await api.disableTotp(row.id);
-        ElMessage.success('已解绑');
-        load();
-      } catch (e) { ElMessage.error(e.message); }
-    }
-    function copyText(t) {
-      navigator.clipboard.writeText(t || '').then(() => ElMessage.success('已复制')).catch(() => ElMessage.warning('复制失败，请手动选择复制'));
-    }
-
-    return { users, keyword, loading, tableHeight, boxRef, dlg, pwdDlg, totpDlg, qrcodeBox, avatarStyle, load, openCreate, openEdit, save, toggleStatus, openReset, savePwd, del, openTotp, bindTotp, unbindTotp, copyText };
+    return { users, keyword, loading, tableHeight, boxRef, dlg, pwdDlg, avatarStyle, load, openCreate, openEdit, save, toggleStatus, openReset, savePwd, del };
   },
 };
 
@@ -1105,7 +1027,9 @@ const Root = {
     onMounted(async () => {
       const token = localStorage.getItem('token');
       if (!token) return;
-      try { user.value = await api.me(); }
+      try {
+        user.value = await api.me();
+      }
       catch { localStorage.removeItem('token'); }
     });
 

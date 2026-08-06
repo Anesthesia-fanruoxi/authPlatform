@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/anesthesia-fanruoxi/authplatform/common"
-	"github.com/anesthesia-fanruoxi/authplatform/model"
+	"authplatform/common"
+	"authplatform/model"
 	"gorm.io/gorm"
 )
 

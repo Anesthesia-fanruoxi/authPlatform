@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/anesthesia-fanruoxi/authplatform/api"
-	"github.com/anesthesia-fanruoxi/authplatform/common"
-	"github.com/anesthesia-fanruoxi/authplatform/web"
+	"authplatform/api"
+	"authplatform/common"
+	"authplatform/web"
 )
 
 // New 组装全部路由。
@@ -49,6 +49,8 @@ func New(s *api.Server) http.Handler {
 	mux.HandleFunc("POST /api/auth/send-code", s.SendCode)
 	mux.HandleFunc("POST /api/auth/change-password", s.ChangePassword)
 	mux.HandleFunc("POST /api/auth/update-profile", s.UpdateProfile)
+	// 平台侧：双因子绑定由平台完成，认证中心只接收存储 TOTP 密钥（登录校验仍走 verify）
+	mux.HandleFunc("POST /api/auth/totp/save", s.SaveTOTP)
 	mux.HandleFunc("GET /api/users/{uid}", s.GetUserByUID)
 	mux.HandleFunc("GET /api/users", s.ListUsersForPlatform)
 
@@ -60,11 +62,6 @@ func New(s *api.Server) http.Handler {
 	mux.HandleFunc("GET /api/admin/bans", adminAuth(s.Users, s.Secret, s.ListBans))
 	mux.HandleFunc("POST /api/admin/bans", adminAuth(s.Users, s.Secret, s.AddBan))
 	mux.HandleFunc("DELETE /api/admin/bans/{username}", adminAuth(s.Users, s.Secret, s.RemoveBan))
-
-	// 管理端：用户 TOTP 双因子
-	mux.HandleFunc("POST /api/admin/users/{id}/totp/generate", adminAuth(s.Users, s.Secret, s.GenerateTOTP))
-	mux.HandleFunc("POST /api/admin/users/{id}/totp/enable", adminAuth(s.Users, s.Secret, s.EnableTOTP))
-	mux.HandleFunc("POST /api/admin/users/{id}/totp/disable", adminAuth(s.Users, s.Secret, s.DisableTOTP))
 
 	mux.HandleFunc("/", serveWeb) // 静态页兜底（未匹配到具体路由的请求）
 

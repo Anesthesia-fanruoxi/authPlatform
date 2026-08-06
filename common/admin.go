@@ -6,7 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/anesthesia-fanruoxi/authplatform/model"
+	"authplatform/model"
 )
 
 // EnsureAdmin 在 users 表为空时创建初始管理员账号。

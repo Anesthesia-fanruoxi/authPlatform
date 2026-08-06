@@ -4,7 +4,7 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/anesthesia-fanruoxi/authplatform/common"
+	"authplatform/common"
 )
 
 // GetUserByUID GET /api/users/{uid}?platform_id=xxx

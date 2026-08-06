@@ -1,4 +1,4 @@
-module github.com/anesthesia-fanruoxi/authplatform
+module authplatform
 
 go 1.25.0
 

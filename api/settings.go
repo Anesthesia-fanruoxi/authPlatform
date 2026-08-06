@@ -6,7 +6,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/anesthesia-fanruoxi/authplatform/common"
+	"authplatform/common"
 )
 
 // ListSettings GET /api/admin/settings 返回全部系统设置。
@@ -67,7 +67,9 @@ func (s *Server) UpdateSettings(w http.ResponseWriter, r *http.Request) {
 		}
 		saveErr = s.Settings.Set(r.Context(), key, m)
 	case "admin_ip_whitelist":
-		var wl struct{ IPs []string `json:"ips"` }
+		var wl struct {
+			IPs []string `json:"ips"`
+		}
 		if err := json.Unmarshal(raw, &wl); err != nil {
 			Fail(w, CodeBadParam, "IP 白名单参数错误")
 			return

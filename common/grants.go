@@ -3,7 +3,7 @@ package common
 import (
 	"context"
 
-	"github.com/anesthesia-fanruoxi/authplatform/model"
+	"authplatform/model"
 	"gorm.io/gorm"
 )
 

@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/anesthesia-fanruoxi/authplatform/common"
-	"github.com/anesthesia-fanruoxi/authplatform/model"
+	"authplatform/common"
+	"authplatform/model"
 )
 
 // verifyPlatformRequest 校验平台请求：签名（新盐优先、旧盐兜底）+ 平台启用状态 + IP 白名单。

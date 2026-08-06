@@ -6,10 +6,10 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/anesthesia-fanruoxi/authplatform/api"
-	"github.com/anesthesia-fanruoxi/authplatform/common"
-	"github.com/anesthesia-fanruoxi/authplatform/config"
-	"github.com/anesthesia-fanruoxi/authplatform/router"
+	"authplatform/api"
+	"authplatform/common"
+	"authplatform/config"
+	"authplatform/router"
 )
 
 func main() {

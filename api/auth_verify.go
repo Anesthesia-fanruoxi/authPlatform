@@ -8,12 +8,15 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/anesthesia-fanruoxi/authplatform/common"
-	"github.com/anesthesia-fanruoxi/authplatform/model"
+	"authplatform/common"
+	"authplatform/model"
 )
 
 // tokenTTLHint 签发 token 的建议有效期（平台侧自行管理生命周期，此值仅为参考）。
 const tokenTTLHint = 24 * time.Hour
+
+// totpTicketTTL 2FA 待验证会话 ticket 有效期（5 分钟，无状态签名）。
+const totpTicketTTL = 5 * time.Minute
 
 // verifyRequest 登录第一步（或单步）请求体。
 type verifyRequest struct {
@@ -138,12 +141,12 @@ func (s *Server) Verify(w http.ResponseWriter, r *http.Request) {
 		s.Tickets.MarkDone(tk, method)
 		audit(1, "step_ok")
 		OK(w, map[string]any{
-			"ticket":       tk,
-			"step":         1,
-			"total_steps":  len(methods),
-			"next_method":  methods[1],
-			"expires_in":   int((5 * time.Minute).Seconds()),
-			"identifier":   identifierForMethod(u, methods[1]),
+			"ticket":      tk,
+			"step":        1,
+			"total_steps": len(methods),
+			"next_method": methods[1],
+			"expires_in":  int((5 * time.Minute).Seconds()),
+			"identifier":  identifierForMethod(u, methods[1]),
 		})
 		return
 	}
@@ -394,6 +397,7 @@ func strPtrEq(p *string, s string) bool {
 }
 
 // issueToken 签发不透明 token 并返回统一登录成功响应。
+// 是否强制改密等业务规则由平台侧自行维护，认证中心只负责校验与签发。
 func (s *Server) issueToken(w http.ResponseWriter, r *http.Request, u *model.User, p *model.Platform) {
 	token, err := common.NewOpaqueToken()
 	if err != nil {

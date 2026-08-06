@@ -34,6 +34,25 @@
 - 管理端（UI）与平台侧（API）**两套认证体系**，互不混用。
 - 数据访问统一 GORM；建表由 model 定义驱动（AutoMigrate）。
 
+### 1.1 数据边界（定论，避免反复纠结）
+
+```
+authPlatform 负责（唯一身份源）       各平台本地负责（authPlatform 不参与）
+├── 账号 / 密码 / 启用状态            ├── 部门 / 角色 / 权限
+├── 用户 ↔ 平台 授权关系             ├── 业务数据 / 本地会话 / token 生命周期
+└── 统一签发 token / 用户基础信息分发  └── 登录限流（平台侧主动防爆破）
+```
+
+- **无同步需求**：部门/角色/权限长在各平台本地，不同平台的组织架构本来就不一致，authPlatform 不需要也不应该知道。
+- 平台从 `GET /api/users?platform_id=` 拉取用户基础信息（uid/username/nickname/status），**在自己的系统里**建本地权限表。
+- authPlatform 只做三件事：验账号密码 → 校验授权 → 发 token；用户在其他平台是什么权限与 authPlatform 无关。
+
+### 1.2 价值主张（为什么集中到 authPlatform）
+
+- **账号事实源唯一**：账号禁用/改密/锁定在 authPlatform 一处生效，所有平台同步拒绝登录——「登录不了 = 账号有问题」只由 authPlatform 判定。
+- **安全验证集中一处**：密码策略、账号维度失败锁定（5 次/15 分钟）、登录审计集中在 authPlatform，各平台直接享受兜底防护，无需各自实现账号安全逻辑。
+- **边界提醒**（设计文档 §8.3）：登录页托管在各平台侧，平台登录页的验证码 / IP 频率限制等**入口防护**仍由平台自己实现；authPlatform 的账号维度限流是**最后一道兜底**，不承担主要防爆。
+
 ---
 
 ## 2. 目录组织规范（新项目模板）
@@ -123,6 +142,21 @@ Headers: X-Platform-Id / X-Timestamp(±300s 防重放) / X-Sign
 | 用户认证 | `GET /api/users/{uid}`、`GET /api/users` | 平台签名 | 接入平台 |
 
 > 规则：`/api/admin/*` 永远走 adminAuth（Bearer），`/api/auth/*`、`/api/users/*` 永远走 verifyPlatformRequest（平台签名），禁止混用。
+
+### 3.7 用户自助操作与双因子（行为在平台，鉴权中心仅存储+统一鉴权）
+
+修改密码、绑定双因子等**操作行为都发生在各接入平台**（平台登录页/个人中心完成），authPlatform 不提供绑定 UI，只负责**存储凭据信息 + 统一鉴权校验**：
+
+| 操作 | 发起方 | 路径 | 鉴权中心做的事 |
+|---|---|---|---|
+| 修改密码 | 平台侧 | `POST /api/auth/change-password` | 验签+授权+验旧密码 → 更新密码哈希 |
+| 修改资料 | 平台侧 | `POST /api/auth/update-profile` | 验签+授权 → 更新昵称 |
+| **绑定双因子** | **平台侧完成全流程**（生成密钥/扫码/验证码确认） | `POST /api/auth/totp/save` | 平台绑定成功后把 secret 上报，**仅存储**（验签+授权+base32 格式校验） |
+| **双因子校验** | 平台侧登录流程 | `verify`（`totp` 登录方式） | 用存储的 secret 统一校验 6 位验证码 |
+
+- **认证中心不做绑定**：不生成密钥、不提供绑定交互；绑定成败由平台负责，绑定完成只上报 `{username, secret}`。
+- **校验集中**：登录时 TOTP 验证码一律由 authPlatform 校验（`verifyCredential` 的 `totp` 分支），平台无需实现 TOTP 算法。
+- **认证中心不提供绑定/解绑 UI**（无 generate/enable/disable 接口）：绑定与解绑均由平台侧完成；管理后台用户列表仅展示「是否已绑定」状态（`totp_enabled`）。
 
 ---
 

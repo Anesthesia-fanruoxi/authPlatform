@@ -2,12 +2,11 @@
 package api
 
 import (
+	"authplatform/common"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"time"
-
-	"github.com/anesthesia-fanruoxi/authplatform/common"
 )
 
 // ListBans GET /api/admin/bans 返回全部黑名单/锁定记录。

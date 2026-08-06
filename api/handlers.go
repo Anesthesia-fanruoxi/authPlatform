@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/anesthesia-fanruoxi/authplatform/common"
+	"authplatform/common"
 )
 
 type Server struct {

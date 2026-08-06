@@ -5,8 +5,8 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/anesthesia-fanruoxi/authplatform/config"
-	"github.com/anesthesia-fanruoxi/authplatform/model"
+	"authplatform/config"
+	"authplatform/model"
 	_ "github.com/go-sql-driver/mysql"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"

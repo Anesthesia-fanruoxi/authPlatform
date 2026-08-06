@@ -7,8 +7,8 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/anesthesia-fanruoxi/authplatform/common"
-	"github.com/anesthesia-fanruoxi/authplatform/model"
+	"authplatform/common"
+	"authplatform/model"
 	"gorm.io/gorm"
 )
 
@@ -18,13 +18,13 @@ var platformIDRe = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}$`)
 // （仅用于创建/轮换后的一次性展示）。login_methods 输出解析后的数组。
 func safePlatform(p *model.Platform, masterKey string, showSecret bool) map[string]any {
 	out := map[string]any{
-		"id":                 p.ID,
-		"platform_id":        p.PlatformID,
-		"name":               p.Name,
-		"ip_whitelist":       p.IPWhitelist,
-		"status":             p.Status,
-		"created_at":         p.CreatedAt.Format(time.RFC3339),
-		"login_methods":      platformLoginMethods(p),
+		"id":                   p.ID,
+		"platform_id":          p.PlatformID,
+		"name":                 p.Name,
+		"ip_whitelist":         p.IPWhitelist,
+		"status":               p.Status,
+		"created_at":           p.CreatedAt.Format(time.RFC3339),
+		"login_methods":        platformLoginMethods(p),
 		"login_methods_custom": p.LoginMethods != "",
 	}
 	if plain, err := common.DecryptSecret(masterKey, p.SecretEnc); err == nil {
@@ -133,9 +133,9 @@ func (s *Server) UpdatePlatform(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		Name         *string  `json:"name"`
-		Status       *int     `json:"status"`
-		IPWhitelist  *string  `json:"ip_whitelist"`
+		Name         *string   `json:"name"`
+		Status       *int      `json:"status"`
+		IPWhitelist  *string   `json:"ip_whitelist"`
 		LoginMethods *[]string `json:"login_methods"` // nil=不改；空数组=清除（用全局默认）
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

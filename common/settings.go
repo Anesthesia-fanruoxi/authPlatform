@@ -7,7 +7,7 @@ import (
 	"errors"
 	"log"
 
-	"github.com/anesthesia-fanruoxi/authplatform/model"
+	"authplatform/model"
 	"gorm.io/gorm"
 )
 

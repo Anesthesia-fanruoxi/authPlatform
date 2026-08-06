@@ -6,7 +6,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/anesthesia-fanruoxi/authplatform/common"
+	"authplatform/common"
 )
 
 // ChangePassword POST /api/auth/change-password

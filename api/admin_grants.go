@@ -1,11 +1,10 @@
 package api
 
 import (
+	"authplatform/common"
 	"encoding/json"
 	"errors"
 	"net/http"
-
-	"github.com/anesthesia-fanruoxi/authplatform/common"
 )
 
 // GrantsMatrix GET /api/admin/grants 返回授权矩阵数据（用户 × 平台 × 现有授权）。

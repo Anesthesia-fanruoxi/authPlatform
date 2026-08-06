@@ -10,7 +10,7 @@
 ```
 authPlatform/
 ├── main.go                          # 程序入口：加载配置 → 连库/建表 → 初始化管理员 → 启动 HTTP
-├── go.mod                           # Go 模块定义（module github.com/anesthesia-fanruoxi/authplatform）
+├── go.mod                           # Go 模块定义（module authplatform）
 ├── go.sum                           # 依赖校验和
 ├── authPlatform设计规格.md           # 产品设计文档（需求/API/错误码/里程碑）
 ├── DIRECTORY.md                     # 本文档（目录说明 + 迁移指南）
