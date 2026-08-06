@@ -10,24 +10,29 @@
 在 **CMDB 库**执行，结果可直接导出 CSV（注意导出时保持 `utf8mb4` 字符集，避免中文乱码）：
 
 ```sql
+-- ① 用户基本信息 + 双因子（列与 authplatform.users 对齐）
 SELECT
-  id                   AS src_id,           -- CMDB 用户 id（仅作核对参考，不迁移）
-  user_name            AS username,         -- -> authplatform.users.username
-  nick_name            AS nickname,         -- -> authplatform.users.nickname
+  user_name            AS username,         -- -> users.username
+  nick_name            AS nickname,         -- -> users.nickname
   phone                AS phone,            -- 空值导入时转 NULL（唯一索引防空串冲突）
   email                AS email,            -- 同上
   is_enabled           AS status,           -- 1=启用 0=禁用 -> users.status
   otp_secret           AS totp_secret,      -- base32 明文，两表格式一致 -> users.totp_secret
   otp_enabled          AS totp_enabled,     -- 1/0 -> users.totp_enabled
-  otp_setup_completed,                      -- 参考列（totp_enabled 已隐含，不迁移）
-  otp_backup_codes     AS otp_backup_codes_json, -- JSON 数组原文，导入后展开到 otp_backup_codes 表
-  created_at,
-  updated_at
+  created_at,                               -- -> users.created_at
+  updated_at                                -- -> users.updated_at
 FROM sys_users
 -- 提示：只导 otp_enabled=1 的用户可直接使用 username_totp 登录；
 -- otp_enabled=0 的用户迁移后无法用该方式登录，需平台侧 POST /api/auth/totp/save 补绑。
 -- WHERE otp_enabled = 1
 ORDER BY id;
+
+-- ② 备用恢复码（otp_backup_codes JSON 原文，供 §3 展开到 authplatform.otp_backup_codes）
+SELECT
+  user_name            AS username,         -- 关联 authplatform.users.username
+  otp_backup_codes     AS otp_backup_codes_json
+FROM sys_users
+WHERE otp_backup_codes IS NOT NULL AND otp_backup_codes <> '';
 ```
 
 **不迁移字段**：`password`（认证中心不用密码登录，插入时写随机占位哈希）、
