@@ -115,6 +115,44 @@ func (s *Server) Me(w http.ResponseWriter, r *http.Request) {
 	OK(w, u.SafeUser())
 }
 
+// MeChangePassword 修改当前登录管理员自己的密码（头像下拉菜单个人设置）POST /api/admin/me/password。
+func (s *Server) MeChangePassword(w http.ResponseWriter, r *http.Request) {
+	userID := currentUserID(r)
+	var req struct {
+		OldPassword string `json:"old_password"`
+		NewPassword string `json:"new_password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.OldPassword == "" || req.NewPassword == "" {
+		Fail(w, CodeBadParam, "参数错误")
+		return
+	}
+	u, err := s.Users.GetByID(r.Context(), userID)
+	if err != nil {
+		s.internalError(w, err)
+		return
+	}
+	ok, _ := common.VerifyPassword(u.PasswordHash, req.OldPassword)
+	if !ok {
+		Fail(w, CodeBadCred, "原密码错误")
+		return
+	}
+	policy := s.Settings.GetPasswordPolicy(r.Context())
+	if err := common.ValidatePasswordWithPolicy(req.NewPassword, policy); err != nil {
+		Fail(w, CodeBadParam, err.Error())
+		return
+	}
+	hash, err := common.HashPassword(req.NewPassword)
+	if err != nil {
+		s.internalError(w, err)
+		return
+	}
+	if err := s.Users.Update(r.Context(), userID, map[string]any{"password_hash": hash}); err != nil {
+		s.internalError(w, err)
+		return
+	}
+	OK(w, nil)
+}
+
 func (s *Server) internalError(w http.ResponseWriter, err error) {
 	log.Printf("[ERROR] %v", err)
 	Fail(w, CodeInternal, "内部错误")

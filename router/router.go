@@ -21,6 +21,7 @@ func New(s *api.Server) http.Handler {
 	mux.HandleFunc("GET /api/health", s.Health)
 	mux.HandleFunc("POST /api/admin/login", s.Login)
 	mux.HandleFunc("GET /api/admin/me", adminAuth(s.Users, s.Secret, s.Me))
+	mux.HandleFunc("POST /api/admin/me/password", adminAuth(s.Users, s.Secret, s.MeChangePassword))
 
 	// 管理端：用户管理
 	mux.HandleFunc("GET /api/admin/users", adminAuth(s.Users, s.Secret, s.ListUsers))

@@ -84,13 +84,22 @@ func ipAllowed(whitelistJSON, ip string) bool {
 	return false
 }
 
-// userWhitelist 对外字段白名单（设计文档 §5.2：uid/username/nickname/status/created_at，
+// userWhitelist 对外字段白名单（uid/username/nickname/phone/email/status/created_at，
 // 绝不返回 password_hash 及任何登录凭据）。
 func userWhitelist(u *model.User) map[string]any {
+	phone, email := "", ""
+	if u.Phone != nil {
+		phone = *u.Phone
+	}
+	if u.Email != nil {
+		email = *u.Email
+	}
 	return map[string]any{
 		"uid":        u.UID,
 		"username":   u.Username,
 		"nickname":   u.Nickname,
+		"phone":      phone,
+		"email":      email,
 		"status":     u.Status,
 		"created_at": u.CreatedAt.Format(time.RFC3339),
 	}

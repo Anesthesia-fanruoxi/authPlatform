@@ -15,6 +15,8 @@ type User struct {
 	// TOTPSecret 双因子 TOTP 密钥（base32，空表示未启用 TOTP）
 	TOTPSecret  string    `gorm:"size:64;default:''" json:"-"`
 	TOTPEnabled bool      `gorm:"default:false" json:"totp_enabled"`
+	// Category 用户分类（开发/测试/运营/风控/数分等，管理员在系统设置维护），用于快捷授权平台。
+	Category    string    `gorm:"size:64;default:''" json:"category"`
 	Status      int       `gorm:"default:1" json:"status"` // 1 启用 0 禁用
 	IsAdmin     bool      `gorm:"default:false" json:"is_admin"`
 	CreatedAt   time.Time `gorm:"autoCreateTime" json:"created_at"`
@@ -41,6 +43,7 @@ func (u *User) SafeUser() map[string]any {
 		"phone":        phone,
 		"email":        email,
 		"totp_enabled": u.TOTPEnabled,
+		"category":     u.Category,
 		"status":       u.Status,
 		"is_admin":     u.IsAdmin,
 		"created_at":   u.CreatedAt.Format(time.RFC3339),

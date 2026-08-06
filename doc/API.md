@@ -166,10 +166,24 @@ print(r)
 ### 4.5 修改资料 `POST /api/auth/update-profile`
 
 ```json
-{"platform_id":"ops-platform","username":"alice","nickname":"爱丽丝"}
+{
+  "platform_id": "ops-platform",
+  "username": "alice",
+  "nickname": "爱丽丝",
+  "email": "alice@example.com",
+  "phone": "13800000000",
+  "password": "new_password_123",
+  "totp_secret": ""
+}
 ```
 
-- 返回该用户白名单信息（uid/username/nickname/status/created_at）。
+- 约定：**变更逻辑在平台处理、数据在认证中心存储**——平台把变更后的字段一次性提交，本接口只负责授权校验与落库。
+- 字段规则：
+  - `nickname`：非空才更新。
+  - `email` / `phone`：**不传=不修改**；`""`=清空（存 NULL，不参与唯一约束）；非空=更新（唯一冲突预检查，已被其他账号使用会报错）。
+  - `password`：非空则代改密码（管理员场景，无需旧密码），authPlatform 哈希存储（校验密码策略）。
+  - `totp_secret`：**不传=不修改**；非空 base32 密钥=重新绑定并启用 TOTP；`""`=清除（解除双因子）。
+- 返回该用户白名单信息（uid/username/nickname/phone/email/status/created_at）。
 
 ### 4.6 上报双因子密钥 `POST /api/auth/totp/save`
 
@@ -178,19 +192,45 @@ print(r)
 ```
 
 - **绑定流程在平台侧完成**（生成密钥/扫码/验证码确认），绑定成功后把 base32 格式 secret 上报，authPlatform 仅存储；后续登录的 TOTP 校验由 authPlatform 统一完成（见 §4.2 `totp` 步）。
+- 重新绑定/解除亦可走 §4.5 `update-profile` 的 `totp_secret` 字段（非空=绑定，`""`=清除）。
 - 返回 `{"code":0,"data":{"totp_enabled":true}}`。
 
 ### 4.7 拉取单个用户 `GET /api/users/{uid}?platform_id=ops-platform`
 
-- 仅返回**授权给本平台**的用户；不存在或未授权一律 HTTP 404（平台侧不可见）。
-- 字段白名单：`uid / username / nickname / status / created_at`（**绝不包含密码等凭据**）。
+- 仅返回**授权给本平台**的用户；不存在、未授权或**认证中心管理员（is_admin）**一律 HTTP 404（平台侧不可见）。
+- 字段白名单：`uid / username / nickname / phone / email / status / created_at`（**绝不包含密码等凭据**）。
 
 ### 4.8 拉取用户列表 `GET /api/users?platform_id=ops-platform&keyword=可选`
 
-- 返回本平台**已授权**的用户列表（服务端强制过滤）：
+- 返回本平台**已授权**的用户列表（服务端强制过滤；**认证中心管理员不返回**，不同步到任何平台）：
   ```json
-  {"code":0,"data":{"users":[{"uid":"u_xxx","username":"alice","nickname":"爱丽丝","status":1,"created_at":"..."}]}}
+  {"code":0,"data":{"users":[{"uid":"u_xxx","username":"alice","nickname":"爱丽丝","phone":"13800000000","email":"alice@example.com","status":1,"created_at":"..."}]}}
   ```
+
+---
+
+### 4.9 管理后台接口（控制台使用，需登录态 `Authorization: Bearer <token>`）
+
+> 登录：`POST /api/admin/login {username, password}` → `{token, user}`；登录成功后后续请求携带 `Authorization: Bearer <token>`。
+> **超级管理员（is_admin=1）不出现在用户列表与授权矩阵中**，其个人信息（如修改密码）通过个人设置完成，由平台侧按需调用 `POST /api/admin/me/password {old_password, new_password}`。
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/api/admin/me` | 当前登录管理员信息 |
+| POST | `/api/admin/me/password` | 修改自己的密码（校验原密码） |
+| GET | `/api/admin/users?keyword=&category=` | 用户列表（不含超管；支持关键字/分类筛选） |
+| POST | `/api/admin/users` | 创建用户 `{username, password, nickname, phone, email, category}` |
+| PUT | `/api/admin/users/{id}` | 更新 `{nickname, phone, email, status, category}` |
+| DELETE | `/api/admin/users/{id}` | 删除用户 |
+| POST | `/api/admin/users/{id}/reset-password` | 重置密码 `{new_password}` |
+| GET | `/api/admin/grants?category=` | 授权矩阵数据（用户×平台，不含超管，支持分类筛选） |
+| POST | `/api/admin/users/{id}/grants` | 全量设置用户可登录平台 `{platform_ids: [1,2]}` |
+| GET/PUT | `/api/admin/platforms`、`/api/admin/platforms/{id}` | 平台管理（创建时返回一次明文 secret） |
+| POST | `/api/admin/platforms/{id}/rotate-secret` | 密钥轮换（双盐过渡，第二次轮换吊销旧盐） |
+| GET | `/api/admin/logs?username=&platform_id=&success=&limit=` | 审计日志 |
+| GET/PUT | `/api/admin/settings`、`/api/admin/settings/{key}` | 系统设置（含 `user_categories` 用户分类列表 `{items:[...]}`） |
+
+**用户分类**：分类（开发/测试/运营/风控/数分等）由管理员在系统设置维护（可自定义增删），用于用户管理标识与授权管理按分类筛选（快捷授权）；分类归属是认证中心存储的用户属性，权限/部门/角色等业务数据仍由各平台自行维护。
 
 ---
 

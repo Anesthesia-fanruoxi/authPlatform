@@ -91,6 +91,7 @@ authPlatform
 
 - **authPlatform 负责**：账号校验、用户 CRUD、平台注册/签发与盐管理、用户↔平台授权、用户信息拉取（按授权过滤）、审计日志。
 - **接入平台负责**：登录页、转发凭证、token 存储与生命周期、本地权限/角色、登录限流防爆破。
+- **认证中心超管隔离**：认证中心内置超管（`is_admin`）与其他平台超管对称——唯一、只用于认证中心自身管理（登录后台），**不进入任何平台的用户列表/单查接口**（列表跳过、单查 404），不同步到任何平台。
 
 ---
 
@@ -162,10 +163,12 @@ POST /api/auth/verify
 ```
 GET /api/users/{uid}?platform_id=xxx       （或 POST /api/users/batch）
 GET /api/users?platform_id=xxx&keyword=    （平台视角列表）
-返回: 仅该平台被授权的用户；未授权用户对平台完全不可见（404/过滤掉）
-字段白名单: uid / username / nickname / status / created_at
+返回: 仅该平台被授权的用户；未授权用户与认证中心超管（is_admin）对平台完全不可见（404/过滤掉）
+字段白名单: uid / username / nickname / phone / email / status / created_at
 绝不返回: password_hash 及任何登录凭据
 ```
+
+> 平台同步时把白名单字段（含手机号/邮箱）写入平台本地用户表，用于展示与授权配置。
 
 ### 5.3 用户管理（管理侧，UI 或管理 API）
 
@@ -192,8 +195,13 @@ GET    /api/admin/platforms          平台列表（secret 脱敏）
 
 ```
 POST /api/auth/change-password   {old_password, new_password, platform_id}（验签名+授权）
-POST /api/auth/update-profile    {nickname, ...}
+POST /api/auth/update-profile    {nickname, email, phone, password, totp_secret, platform_id}（验签名+授权）
 ```
+
+**`update-profile` 承载所有认证中心资料变更**（约定：逻辑在平台处理、数据在认证中心存储）：
+- `nickname` / `email` / `phone`：非空更新；`email`/`phone` 传 `""` 表示清空（存 NULL）；不传表示不修改
+- `password`：非空则管理员代改密码（无需旧密码），认证中心哈希存储
+- `totp_secret`：非空=重新绑定并启用 TOTP；`""`=清除双因子；不传=不修改
 
 ### 5.6 错误码
 

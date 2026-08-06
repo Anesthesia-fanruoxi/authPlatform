@@ -50,10 +50,15 @@ const api = {
     return this.request('/api/admin/login', { method: 'POST', body: JSON.stringify({ username, password }) });
   },
   me() { return this.request('/api/admin/me'); },
+  meChangePassword(old_password, new_password) {
+    return this.request('/api/admin/me/password', { method: 'POST', body: JSON.stringify({ old_password, new_password }) });
+  },
   // 用户管理
-  listUsers(keyword) {
-    const q = keyword ? '?keyword=' + encodeURIComponent(keyword) : '';
-    return this.request('/api/admin/users' + q);
+  listUsers(keyword, category) {
+    const qs = [];
+    if (keyword) qs.push('keyword=' + encodeURIComponent(keyword));
+    if (category) qs.push('category=' + encodeURIComponent(category));
+    return this.request('/api/admin/users' + (qs.length ? '?' + qs.join('&') : ''));
   },
   createUser(payload) { return this.request('/api/admin/users', { method: 'POST', body: JSON.stringify(payload) }); },
   updateUser(id, payload) { return this.request('/api/admin/users/' + id, { method: 'PUT', body: JSON.stringify(payload) }); },
@@ -68,7 +73,10 @@ const api = {
   deletePlatform(id) { return this.request('/api/admin/platforms/' + id, { method: 'DELETE' }); },
   rotateSecret(id) { return this.request('/api/admin/platforms/' + id + '/rotate-secret', { method: 'POST' }); },
   // 授权管理
-  grantsMatrix() { return this.request('/api/admin/grants'); },
+  grantsMatrix(category) {
+    const q = category ? '?category=' + encodeURIComponent(category) : '';
+    return this.request('/api/admin/grants' + q);
+  },
   setUserGrants(id, platform_ids) {
     return this.request('/api/admin/users/' + id + '/grants', { method: 'POST', body: JSON.stringify({ platform_ids }) });
   },
@@ -156,10 +164,10 @@ const UsersPage = {
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="角色" width="90" align="center">
+        <el-table-column label="分类" width="100" align="center">
           <template #default="{row}">
-            <el-tag v-if="row.is_admin" type="warning" effect="light" round>管理员</el-tag>
-            <span v-else style="color:#8a97ab">普通</span>
+            <el-tag v-if="row.category" effect="plain" round>{{ row.category }}</el-tag>
+            <span v-else style="color:#8a97ab">未分类</span>
           </template>
         </el-table-column>
         <el-table-column label="双因子" width="100" align="center">
@@ -193,6 +201,11 @@ const UsersPage = {
       <el-form label-width="80px">
         <el-form-item label="用户名"><el-input v-model="dlg.form.username" :disabled="dlg.isEdit" placeholder="请输入用户名" /></el-form-item>
         <el-form-item label="昵称"><el-input v-model="dlg.form.nickname" placeholder="请输入昵称" /></el-form-item>
+        <el-form-item label="分类">
+          <el-select v-model="dlg.form.category" clearable placeholder="选填，用于快捷授权平台" style="width:100%">
+            <el-option v-for="c in categories" :key="c" :label="c" :value="c" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="手机号"><el-input v-model="dlg.form.phone" placeholder="选填，用于手机号登录/验证码" /></el-form-item>
         <el-form-item label="邮箱"><el-input v-model="dlg.form.email" placeholder="选填，用于邮箱登录/验证码" /></el-form-item>
         <el-form-item v-if="!dlg.isEdit" label="密码">
@@ -222,9 +235,10 @@ const UsersPage = {
   setup() {
     const users = ref([]);
     const keyword = ref('');
+    const categories = ref([]);
     const loading = ref(false);
     const { tableHeight, boxRef } = useTableFill();
-    const dlg = reactive({ visible: false, isEdit: false, saving: false, form: { id: 0, username: '', nickname: '', phone: '', email: '', password: '' } });
+    const dlg = reactive({ visible: false, isEdit: false, saving: false, form: { id: 0, username: '', nickname: '', category: '', phone: '', email: '', password: '' } });
     const pwdDlg = reactive({ visible: false, saving: false, id: 0, username: '', password: '' });
 
     const avatarPalette = ['#2f6fed', '#7a5cff', '#0ea5a4', '#e07a3f', '#d64f8c', '#3f9e4d'];
@@ -236,6 +250,12 @@ const UsersPage = {
       return { width: '26px', height: '26px', 'font-size': '12px', background: 'linear-gradient(135deg, ' + c + ', ' + c + 'cc)' };
     }
 
+    async function loadCategories() {
+      try {
+        const d = await api.listSettings();
+        categories.value = (d.user_categories && d.user_categories.items) || [];
+      } catch { /* 分类加载失败不阻塞列表 */ }
+    }
     async function load() {
       loading.value = true;
       try {
@@ -244,25 +264,25 @@ const UsersPage = {
       } catch (e) { ElMessage.error(e.message); }
       finally { loading.value = false; }
     }
-    onMounted(load);
+    onMounted(() => { load(); loadCategories(); });
 
     function openCreate() {
       dlg.isEdit = false;
-      dlg.form = { id: 0, username: '', nickname: '', phone: '', email: '', password: '' };
+      dlg.form = { id: 0, username: '', nickname: '', category: '', phone: '', email: '', password: '' };
       dlg.visible = true;
     }
     function openEdit(row) {
       dlg.isEdit = true;
-      dlg.form = { id: row.id, username: row.username, nickname: row.nickname, phone: row.phone || '', email: row.email || '', password: '' };
+      dlg.form = { id: row.id, username: row.username, nickname: row.nickname, category: row.category || '', phone: row.phone || '', email: row.email || '', password: '' };
       dlg.visible = true;
     }
     async function save() {
       dlg.saving = true;
       try {
         if (dlg.isEdit) {
-          await api.updateUser(dlg.form.id, { nickname: dlg.form.nickname, phone: dlg.form.phone, email: dlg.form.email });
+          await api.updateUser(dlg.form.id, { nickname: dlg.form.nickname, phone: dlg.form.phone, email: dlg.form.email, category: dlg.form.category });
         } else {
-          await api.createUser({ username: dlg.form.username, password: dlg.form.password, nickname: dlg.form.nickname, phone: dlg.form.phone, email: dlg.form.email });
+          await api.createUser({ username: dlg.form.username, password: dlg.form.password, nickname: dlg.form.nickname, phone: dlg.form.phone, email: dlg.form.email, category: dlg.form.category });
         }
         ElMessage.success('保存成功');
         dlg.visible = false;
@@ -303,7 +323,7 @@ const UsersPage = {
       } catch (e) { ElMessage.error(e.message); }
     }
 
-    return { users, keyword, loading, tableHeight, boxRef, dlg, pwdDlg, avatarStyle, load, openCreate, openEdit, save, toggleStatus, openReset, savePwd, del };
+    return { users, keyword, categories, loading, tableHeight, boxRef, dlg, pwdDlg, avatarStyle, load, openCreate, openEdit, save, toggleStatus, openReset, savePwd, del };
   },
 };
 
@@ -496,6 +516,9 @@ const GrantsPage = {
             <el-input v-model="filter" placeholder="子序列筛选：用户名/昵称" style="width:220px" clearable>
               <template #prefix>${svg('user', 'ipt-ic')}</template>
             </el-input>
+            <el-select v-model="categoryFilter" placeholder="按分类筛选" clearable style="width:130px" @change="load">
+              <el-option v-for="c in categories" :key="c" :label="c" :value="c" />
+            </el-select>
             <el-button :loading="loading" @click="load">${svg('refresh', 'ic-btn')}刷新</el-button>
           </div>
         </div>
@@ -510,6 +533,7 @@ const GrantsPage = {
               <span class="avatar" :style="avatarStyle(row)">{{ (row.nickname || row.username).slice(0,1) }}</span>
               <span>
                 <b>{{ row.username }}</b>
+                <el-tag v-if="row.category" size="small" effect="plain" round style="margin-left:6px">{{ row.category }}</el-tag>
                 <span v-if="row.nickname" style="color:#8a97ab;font-size:12px">（{{ row.nickname }}）</span>
               </span>
             </span>
@@ -535,6 +559,8 @@ const GrantsPage = {
     const matrixUsers = ref([]);
     const loading = ref(false);
     const filter = ref('');
+    const categoryFilter = ref('');
+    const categories = ref([]);
     const { tableHeight, boxRef } = useTableFill();
 
     // 子序列匹配：输入字符按序出现在目标字符串中即可命中（不要求连续，大小写不敏感）
@@ -561,10 +587,16 @@ const GrantsPage = {
       return { width: '26px', height: '26px', 'font-size': '12px', background: 'linear-gradient(135deg, ' + c + ', ' + c + 'cc)' };
     }
 
+    async function loadCategories() {
+      try {
+        const d = await api.listSettings();
+        categories.value = (d.user_categories && d.user_categories.items) || [];
+      } catch { /* 忽略 */ }
+    }
     async function load() {
       loading.value = true;
       try {
-        const data = await api.grantsMatrix();
+        const data = await api.grantsMatrix(categoryFilter.value || '');
         platforms.value = data.platforms || [];
         const grants = (data.grants || []).filter(g => g.status === 1);
         const map = {};
@@ -572,11 +604,11 @@ const GrantsPage = {
           if (!map[g.user_id]) map[g.user_id] = {};
           map[g.user_id][g.platform_id] = true;
         });
-        matrixUsers.value = (data.users || []).map(u => ({ id: u.id, username: u.username, nickname: u.nickname, grants: map[u.id] || {} }));
+        matrixUsers.value = (data.users || []).map(u => ({ id: u.id, username: u.username, nickname: u.nickname, category: u.category || '', grants: map[u.id] || {} }));
       } catch (e) { ElMessage.error(e.message); }
       finally { loading.value = false; }
     }
-    onMounted(load);
+    onMounted(() => { load(); loadCategories(); });
 
     async function toggle(row, p, val) {
       row.grants[p.id] = !!val;
@@ -590,7 +622,7 @@ const GrantsPage = {
       }
     }
 
-    return { platforms, matrixUsers, filteredUsers, filter, loading, tableHeight, boxRef, avatarStyle, load, toggle };
+    return { platforms, matrixUsers, filteredUsers, filter, categoryFilter, categories, loading, tableHeight, boxRef, avatarStyle, load, toggle };
   },
 };
 
@@ -861,6 +893,19 @@ const SettingsPage = {
         <p class="settings-tip">仅管理后台登录生效（管理端部署于内网）。留空 = 不限制。</p>
         <div class="settings-actions"><el-button type="primary" :loading="savingKey==='admin_ip_whitelist'" @click="save('admin_ip_whitelist')">保存</el-button></div>
       </el-card>
+
+      <el-card class="settings-card">
+        <template #header><div class="card-title">${svg('user')}用户分类</div></template>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;min-height:32px">
+          <el-tag v-for="(c, i) in categories" :key="c" closable size="large" @close="removeCategory(i)">{{ c }}</el-tag>
+        </div>
+        <div style="display:flex;gap:8px">
+          <el-input v-model="newCategory" placeholder="新分类名称" style="width:200px" maxlength="32" @keyup.enter="addCategory" />
+          <el-button type="primary" plain @click="addCategory">添加分类</el-button>
+        </div>
+        <p class="settings-tip">用户分类用于用户管理标识与授权管理按分类筛选（快捷授权）。删除分类不影响已归属用户，仅从可选列表移除。</p>
+        <div class="settings-actions"><el-button type="primary" :loading="savingKey==='user_categories'" @click="save('user_categories')">保存</el-button></div>
+      </el-card>
     </div>
   `,
   setup() {
@@ -871,6 +916,8 @@ const SettingsPage = {
     });
     const loginMethods = ref([]);
     const ipText = ref('');
+    const categories = ref([]);
+    const newCategory = ref('');
     const savingKey = ref('');
 
     async function load() {
@@ -880,9 +927,19 @@ const SettingsPage = {
         if (d.login_limit) Object.assign(form.login_limit, d.login_limit);
         loginMethods.value = (d.login_methods && d.login_methods.methods) || ['username_password'];
         ipText.value = ((d.admin_ip_whitelist && d.admin_ip_whitelist.ips) || []).join('\n');
+        categories.value = (d.user_categories && d.user_categories.items) || [];
       } catch (e) { ElMessage.error(e.message); }
     }
     onMounted(load);
+
+    function addCategory() {
+      const c = newCategory.value.trim();
+      if (!c) { ElMessage.warning('请输入分类名称'); return; }
+      if (categories.value.includes(c)) { ElMessage.warning('分类已存在'); return; }
+      categories.value.push(c);
+      newCategory.value = '';
+    }
+    function removeCategory(i) { categories.value.splice(i, 1); }
 
     async function save(key) {
       savingKey.value = key;
@@ -900,13 +957,16 @@ const SettingsPage = {
         } else if (key === 'admin_ip_whitelist') {
           const ips = ipText.value.split('\n').map(s => s.trim()).filter(Boolean);
           await api.updateSettings(key, { ips });
+        } else if (key === 'user_categories') {
+          if (categories.value.length === 0) { ElMessage.warning('至少保留一个分类'); return; }
+          await api.updateSettings(key, { items: categories.value });
         }
         ElMessage.success('保存成功');
       } catch (e) { ElMessage.error(e.message); }
       finally { savingKey.value = ''; }
     }
 
-    return { methodOptions, form, loginMethods, ipText, savingKey, load, save };
+    return { methodOptions, form, loginMethods, ipText, categories, newCategory, savingKey, load, save, addCategory, removeCategory };
   },
 };
 
@@ -960,9 +1020,19 @@ const Root = {
         <el-header class="hdr">
           <span class="hdr-title">{{ pageTitle }}</span>
           <div class="hdr-right">
-            <span class="avatar">{{ (user.nickname || user.username).slice(0,1) }}</span>
-            <span class="hdr-user">{{ user.nickname || user.username }}</span>
-            <el-button link type="primary" @click="logout">退出登录</el-button>
+            <el-dropdown trigger="click" @command="onHdrCmd">
+              <span class="hdr-user-wrap">
+                <span class="avatar">{{ (user.nickname || user.username).slice(0,1) }}</span>
+                <span class="hdr-user">{{ user.nickname || user.username }}</span>
+                <span class="caret">▾</span>
+              </span>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="pwd">修改密码</el-dropdown-item>
+                  <el-dropdown-item command="logout" divided>退出登录</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
           </div>
         </el-header>
         <el-main class="main">
@@ -973,12 +1043,27 @@ const Root = {
         </el-main>
       </el-container>
     </el-container>
+
+    <!-- 个人设置：修改密码（头像下拉进入） -->
+    <el-dialog v-model="mePwdDlg.visible" title="修改密码" width="420" align-center>
+      <el-form label-width="90px">
+        <el-form-item label="原密码"><el-input v-model="mePwdDlg.old" type="password" show-password /></el-form-item>
+        <el-form-item label="新密码">
+          <el-input v-model="mePwdDlg.newp" type="password" show-password placeholder="至少8位，含字母和数字" @keyup.enter="saveMePwd" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="mePwdDlg.visible = false">取消</el-button>
+        <el-button type="primary" :loading="mePwdDlg.saving" @click="saveMePwd">保存</el-button>
+      </template>
+    </el-dialog>
   `,
   setup() {
     const user = ref({});
     const username = ref('');
     const password = ref('');
     const loading = ref(false);
+    const mePwdDlg = reactive({ visible: false, saving: false, old: '', newp: '' });
 
     const route = ref(location.hash.replace(/^#/, '') || '/users');
     const pageComponent = computed(() => {
@@ -1024,6 +1109,25 @@ const Root = {
       route.value = '/users';
       location.hash = '';
     }
+    function onHdrCmd(cmd) {
+      if (cmd === 'pwd') {
+        mePwdDlg.old = '';
+        mePwdDlg.newp = '';
+        mePwdDlg.visible = true;
+      } else if (cmd === 'logout') {
+        logout();
+      }
+    }
+    async function saveMePwd() {
+      if (!mePwdDlg.old || !mePwdDlg.newp) { ElMessage.warning('请填写原密码和新密码'); return; }
+      mePwdDlg.saving = true;
+      try {
+        await api.meChangePassword(mePwdDlg.old, mePwdDlg.newp);
+        ElMessage.success('密码已修改');
+        mePwdDlg.visible = false;
+      } catch (e) { ElMessage.error(e.message); }
+      finally { mePwdDlg.saving = false; }
+    }
     onMounted(async () => {
       const token = localStorage.getItem('token');
       if (!token) return;
@@ -1033,7 +1137,7 @@ const Root = {
       catch { localStorage.removeItem('token'); }
     });
 
-    return { user, username, password, loading, route, pageComponent, pageNames, pageTitle, onMenu, doLogin, logout };
+    return { user, username, password, loading, mePwdDlg, route, pageComponent, pageNames, pageTitle, onMenu, doLogin, logout, onHdrCmd, saveMePwd };
   },
 };
 

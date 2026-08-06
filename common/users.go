@@ -96,12 +96,19 @@ func (s *UserStore) ListByIDs(ctx context.Context, ids []int64, keyword string) 
 	return users, nil
 }
 
-// List 按关键字（用户名/昵称模糊匹配）返回用户列表，按 id 升序。
-func (s *UserStore) List(ctx context.Context, keyword string) ([]*model.User, error) {
+// List 按条件返回用户列表：keyword 模糊匹配用户名/昵称；
+// excludeAdmins=true 时排除超级管理员；category 非空时按分类过滤。按 id 升序。
+func (s *UserStore) List(ctx context.Context, keyword string, excludeAdmins bool, category string) ([]*model.User, error) {
 	q := s.db.WithContext(ctx).Model(&model.User{})
 	if keyword != "" {
 		like := "%" + keyword + "%"
 		q = q.Where("username LIKE ? OR nickname LIKE ?", like, like)
+	}
+	if excludeAdmins {
+		q = q.Where("is_admin = ?", false)
+	}
+	if category != "" {
+		q = q.Where("category = ?", category)
 	}
 	var users []*model.User
 	if err := q.Order("id ASC").Find(&users).Error; err != nil {

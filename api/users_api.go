@@ -23,6 +23,11 @@ func (s *Server) GetUserByUID(w http.ResponseWriter, r *http.Request) {
 		s.internalError(w, err)
 		return
 	}
+	if u.IsAdmin {
+		// 认证中心管理员（含 admin）不对任何平台可见
+		http.NotFound(w, r)
+		return
+	}
 	granted, err := s.Grants.Granted(r.Context(), u.ID, p.ID)
 	if err != nil {
 		s.internalError(w, err)
@@ -58,6 +63,9 @@ func (s *Server) ListUsersForPlatform(w http.ResponseWriter, r *http.Request) {
 	}
 	safe := make([]map[string]any, 0, len(users))
 	for _, u := range users {
+		if u.IsAdmin {
+			continue // 认证中心管理员（含 admin）不对任何平台可见
+		}
 		safe = append(safe, userWhitelist(u))
 	}
 	OK(w, map[string]any{"users": safe})

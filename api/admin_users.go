@@ -11,9 +11,10 @@ import (
 	"gorm.io/gorm"
 )
 
-// ListUsers 用户列表（支持 keyword 模糊匹配用户名/昵称）。
+// ListUsers 用户列表（超级管理员不展示；支持 keyword / category 筛选）。
 func (s *Server) ListUsers(w http.ResponseWriter, r *http.Request) {
-	users, err := s.Users.List(r.Context(), r.URL.Query().Get("keyword"))
+	q := r.URL.Query()
+	users, err := s.Users.List(r.Context(), q.Get("keyword"), true, q.Get("category"))
 	if err != nil {
 		s.internalError(w, err)
 		return
@@ -33,6 +34,8 @@ func (s *Server) CreateUser(w http.ResponseWriter, r *http.Request) {
 		Nickname string `json:"nickname"`
 		Phone    string `json:"phone"`
 		Email    string `json:"email"`
+		// 可选用户分类（未配置分类时忽略）
+		Category string `json:"category"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Username == "" || req.Password == "" {
 		Fail(w, CodeBadParam, "参数错误")
@@ -60,6 +63,7 @@ func (s *Server) CreateUser(w http.ResponseWriter, r *http.Request) {
 		Nickname:     req.Nickname,
 		Phone:        emptyToNil(req.Phone),
 		Email:        emptyToNil(req.Email),
+		Category:     req.Category,
 		Status:       1,
 	}
 	if err := s.Users.Create(r.Context(), u); err != nil {
@@ -85,6 +89,7 @@ func (s *Server) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		Phone    *string `json:"phone"`
 		Email    *string `json:"email"`
 		Status   *int    `json:"status"`
+		Category *string `json:"category"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		Fail(w, CodeBadParam, "参数错误")
@@ -106,6 +111,9 @@ func (s *Server) UpdateUser(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		updates["status"] = *req.Status
+	}
+	if req.Category != nil {
+		updates["category"] = *req.Category
 	}
 	if len(updates) == 0 {
 		Fail(w, CodeBadParam, "参数错误")

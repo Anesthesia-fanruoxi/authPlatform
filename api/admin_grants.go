@@ -8,8 +8,9 @@ import (
 )
 
 // GrantsMatrix GET /api/admin/grants 返回授权矩阵数据（用户 × 平台 × 现有授权）。
+// 超级管理员不展示；支持 ?category= 按用户分类筛选（快捷授权）。
 func (s *Server) GrantsMatrix(w http.ResponseWriter, r *http.Request) {
-	users, err := s.Users.List(r.Context(), "")
+	users, err := s.Users.List(r.Context(), "", true, r.URL.Query().Get("category"))
 	if err != nil {
 		s.internalError(w, err)
 		return
@@ -32,6 +33,7 @@ func (s *Server) GrantsMatrix(w http.ResponseWriter, r *http.Request) {
 			"uid":      u.UID,
 			"username": u.Username,
 			"nickname": u.Nickname,
+			"category": u.Category,
 			"status":   u.Status,
 		})
 	}

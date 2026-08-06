@@ -46,6 +46,14 @@ type AdminIPWhitelist struct {
 	IPs []string `json:"ips"`
 }
 
+// UserCategories 用户分类列表（可自定义，用于用户分类与快捷授权平台）。
+type UserCategories struct {
+	Items []string `json:"items"`
+}
+
+// defaultUserCategories 默认用户分类（管理员可在系统设置中增删改）。
+var defaultUserCategories = UserCategories{Items: []string{"开发", "测试", "运营", "风控", "数分"}}
+
 var defaultPasswordPolicy = PasswordPolicy{MinLength: 8, RequireLetter: true, RequireDigit: true, RequireSpecial: false}
 var defaultLoginLimit = LoginLimit{MaxFails: 5, WindowMinutes: 15, LockMinutes: 15}
 var defaultLoginMethods = LoginMethods{Methods: []string{LoginMethodUsernamePassword}}
@@ -66,6 +74,7 @@ func (s *SettingsStore) EnsureDefaults(ctx context.Context) error {
 		"login_limit":        defaultLoginLimit,
 		"login_methods":      defaultLoginMethods,
 		"admin_ip_whitelist": AdminIPWhitelist{IPs: []string{}},
+		"user_categories":    defaultUserCategories,
 	}
 	for key, val := range defaults {
 		var n int64
@@ -130,6 +139,19 @@ func (s *SettingsStore) GetLoginLimit(ctx context.Context) LoginLimit {
 }
 
 // GetLoginMethods 返回登录方式配置；未配置/解析失败回退默认（用户名+密码）。
+// GetUserCategories 返回用户分类列表；未配置/解析失败回退默认预设。
+func (s *SettingsStore) GetUserCategories(ctx context.Context) []string {
+	var c UserCategories
+	if err := s.getJSON(ctx, "user_categories", &c); err != nil {
+		log.Printf("[settings] user_categories parse error: %v", err)
+		return defaultUserCategories.Items
+	}
+	if len(c.Items) == 0 {
+		return defaultUserCategories.Items
+	}
+	return c.Items
+}
+
 func (s *SettingsStore) GetLoginMethods(ctx context.Context) LoginMethods {
 	var m LoginMethods
 	if err := s.getJSON(ctx, "login_methods", &m); err != nil {

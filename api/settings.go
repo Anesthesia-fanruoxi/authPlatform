@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strings"
 
 	"authplatform/common"
 )
@@ -24,7 +25,7 @@ func (s *Server) ListSettings(w http.ResponseWriter, r *http.Request) {
 func (s *Server) UpdateSettings(w http.ResponseWriter, r *http.Request) {
 	key := r.PathValue("key")
 	switch key {
-	case "password_policy", "login_limit", "login_methods", "admin_ip_whitelist":
+	case "password_policy", "login_limit", "login_methods", "admin_ip_whitelist", "user_categories":
 	default:
 		Fail(w, CodeBadParam, "不支持的设置项")
 		return
@@ -75,6 +76,23 @@ func (s *Server) UpdateSettings(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		saveErr = s.Settings.Set(r.Context(), key, wl)
+	case "user_categories":
+		var c common.UserCategories
+		if err := json.Unmarshal(raw, &c); err != nil || len(c.Items) == 0 || len(c.Items) > 30 {
+			Fail(w, CodeBadParam, "分类参数错误（1-30 个分类）")
+			return
+		}
+		seen := map[string]bool{}
+		for i, it := range c.Items {
+			it = strings.TrimSpace(it)
+			if it == "" || len([]rune(it)) > 32 || seen[it] {
+				Fail(w, CodeBadParam, "分类不能为空/重复/超长（≤32 字符）")
+				return
+			}
+			seen[it] = true
+			c.Items[i] = it
+		}
+		saveErr = s.Settings.Set(r.Context(), key, c)
 	}
 	if saveErr != nil {
 		s.internalError(w, saveErr)
