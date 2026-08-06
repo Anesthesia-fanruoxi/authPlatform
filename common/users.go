@@ -131,3 +131,13 @@ func (s *UserStore) Count(ctx context.Context) (int64, error) {
 	err := s.db.WithContext(ctx).Model(&model.User{}).Count(&n).Error
 	return n, err
 }
+
+// UpdateCategory 批量设置用户分类（空串表示清除分类）。
+func (s *UserStore) UpdateCategory(ctx context.Context, userIDs []int64, category string) error {
+	if len(userIDs) == 0 {
+		return nil
+	}
+	return s.db.WithContext(ctx).Model(&model.User{}).
+		Where("id IN ?", userIDs).
+		Update("category", category).Error
+}

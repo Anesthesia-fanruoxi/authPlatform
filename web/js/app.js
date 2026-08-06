@@ -63,6 +63,9 @@ const api = {
   },
   createUser(payload) { return this.request('/api/admin/users', { method: 'POST', body: JSON.stringify(payload) }); },
   updateUser(id, payload) { return this.request('/api/admin/users/' + id, { method: 'PUT', body: JSON.stringify(payload) }); },
+  batchSetCategory(user_ids, category) {
+    return this.request('/api/admin/users/batch-category', { method: 'POST', body: JSON.stringify({ user_ids, category }) });
+  },
   deleteUser(id) { return this.request('/api/admin/users/' + id, { method: 'DELETE' }); },
   resetPassword(id, new_password) {
     return this.request('/api/admin/users/' + id + '/reset-password', { method: 'POST', body: JSON.stringify({ new_password }) });
@@ -138,11 +141,13 @@ const UsersPage = {
               <template #prefix>${svg('user', 'ipt-ic')}</template>
             </el-input>
             <el-button type="primary" @click="openCreate">新建用户</el-button>
+            <el-button type="warning" plain :disabled="!selectedIds.length" @click="openBatchCategory">批量分类{{ selectedIds.length ? '（' + selectedIds.length + '）' : '' }}</el-button>
           </div>
         </div>
       </template>
       <div class="table-box" ref="boxRef">
-      <el-table :data="users" v-loading="loading" stripe :height="tableHeight">
+      <el-table :data="users" v-loading="loading" stripe :height="tableHeight" row-key="id" @selection-change="onSelectionChange">
+        <el-table-column type="selection" width="44" />
         <el-table-column prop="uid" label="UID" width="230">
           <template #default="{row}"><span style="font-family:Consolas,Menlo,monospace;font-size:12px;color:#5a6b82">{{ row.uid }}</span></template>
         </el-table-column>
@@ -222,6 +227,18 @@ const UsersPage = {
       </template>
     </el-dialog>
 
+    <!-- 批量设置分类 -->
+    <el-dialog v-model="catDlg.visible" title="批量设置分类" width="420" align-center>
+      <p style="margin-bottom:12px">已选 <b>{{ selectedIds.length }}</b> 个用户，选择要设置的分类：</p>
+      <el-select v-model="catDlg.category" clearable placeholder="选择分类（留空=清除分类）" style="width:100%">
+        <el-option v-for="c in categories" :key="c" :label="c" :value="c" />
+      </el-select>
+      <template #footer>
+        <el-button @click="catDlg.visible = false">取消</el-button>
+        <el-button type="primary" :loading="catDlg.saving" @click="doBatchCategory">确定</el-button>
+      </template>
+    </el-dialog>
+
     <el-dialog v-model="pwdDlg.visible" title="重置密码" width="400" align-center>
       <el-form label-width="80px">
         <el-form-item label="账号">{{ pwdDlg.username }}</el-form-item>
@@ -244,6 +261,8 @@ const UsersPage = {
     const { tableHeight, boxRef } = useTableFill();
     const dlg = reactive({ visible: false, isEdit: false, saving: false, form: { id: 0, username: '', nickname: '', category: '', phone: '', email: '', password: '' } });
     const pwdDlg = reactive({ visible: false, saving: false, id: 0, username: '', password: '' });
+    const catDlg = reactive({ visible: false, saving: false, category: '' });
+    const selectedIds = ref([]);
 
     const avatarPalette = ['#2f6fed', '#7a5cff', '#0ea5a4', '#e07a3f', '#d64f8c', '#3f9e4d'];
     function avatarStyle(row) {
@@ -318,6 +337,26 @@ const UsersPage = {
       } catch (e) { ElMessage.error(e.message); }
       finally { pwdDlg.saving = false; }
     }
+    function onSelectionChange(rows) {
+      selectedIds.value = rows.map(r => r.id);
+    }
+    function openBatchCategory() {
+      if (!selectedIds.value.length) { ElMessage.warning('请先勾选用户'); return; }
+      catDlg.category = '';
+      loadCategories();
+      catDlg.visible = true;
+    }
+    async function doBatchCategory() {
+      if (!selectedIds.value.length) return;
+      catDlg.saving = true;
+      try {
+        await api.batchSetCategory(selectedIds.value, catDlg.category || '');
+        ElMessage.success(`已为 ${selectedIds.value.length} 个用户${catDlg.category ? '设置分类「' + catDlg.category + '」' : '清除分类'}`);
+        catDlg.visible = false;
+        load();
+      } catch (e) { ElMessage.error(e.message); }
+      finally { catDlg.saving = false; }
+    }
     async function del(row) {
       try {
         await ElMessageBox.confirm(`确定删除用户「${row.username}」？该操作不可恢复。`, '提示', { type: 'warning' });
@@ -329,7 +368,7 @@ const UsersPage = {
       } catch (e) { ElMessage.error(e.message); }
     }
 
-    return { users, keyword, categories, loading, tableHeight, boxRef, dlg, pwdDlg, avatarStyle, load, openCreate, openEdit, save, toggleStatus, openReset, savePwd, del };
+    return { users, keyword, categories, loading, tableHeight, boxRef, dlg, pwdDlg, catDlg, selectedIds, avatarStyle, load, openCreate, openEdit, save, toggleStatus, openReset, savePwd, del, onSelectionChange, openBatchCategory, doBatchCategory };
   },
 };
 

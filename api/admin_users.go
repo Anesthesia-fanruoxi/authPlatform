@@ -11,6 +11,32 @@ import (
 	"gorm.io/gorm"
 )
 
+// BatchSetCategory POST /api/admin/users/batch-category 批量设置用户分类。
+// body: {"user_ids":[1,2,3], "category":"开发"}；category 为空串表示清除分类。
+func (s *Server) BatchSetCategory(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		UserIDs  []int64 `json:"user_ids"`
+		Category string  `json:"category"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || len(req.UserIDs) == 0 {
+		Fail(w, CodeBadParam, "参数错误（user_ids 不能为空）")
+		return
+	}
+	if len(req.UserIDs) > 5000 {
+		Fail(w, CodeBadParam, "单次最多 5000 个用户")
+		return
+	}
+	if len([]rune(req.Category)) > 32 {
+		Fail(w, CodeBadParam, "分类名称超长（≤32 字符）")
+		return
+	}
+	if err := s.Users.UpdateCategory(r.Context(), req.UserIDs, req.Category); err != nil {
+		s.internalError(w, err)
+		return
+	}
+	OK(w, nil)
+}
+
 // ListUsers 用户列表（超级管理员不展示；支持 keyword / category 筛选）。
 func (s *Server) ListUsers(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()

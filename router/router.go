@@ -26,6 +26,7 @@ func New(s *api.Server) http.Handler {
 	// 管理端：用户管理
 	mux.HandleFunc("GET /api/admin/users", adminAuth(s.Users, s.Secret, s.ListUsers))
 	mux.HandleFunc("POST /api/admin/users", adminAuth(s.Users, s.Secret, s.CreateUser))
+	mux.HandleFunc("POST /api/admin/users/batch-category", adminAuth(s.Users, s.Secret, s.BatchSetCategory))
 	mux.HandleFunc("PUT /api/admin/users/{id}", adminAuth(s.Users, s.Secret, s.UpdateUser))
 	mux.HandleFunc("DELETE /api/admin/users/{id}", adminAuth(s.Users, s.Secret, s.DeleteUser))
 	mux.HandleFunc("POST /api/admin/users/{id}/reset-password", adminAuth(s.Users, s.Secret, s.ResetPassword))
