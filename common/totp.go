@@ -33,7 +33,12 @@ func GenerateTOTPSecret() (string, error) {
 
 // totpCode 计算某个时间步的 TOTP 码（RFC 6238：HMAC-SHA1 + dynamic truncation）。
 func totpCode(secret string, t time.Time) (string, error) {
-	key, err := base32.StdEncoding.DecodeString(strings.ToUpper(secret))
+	// 兼容无 padding 的 base32 secret（如 CMDB 导入的 26 字符密钥）
+	s := strings.ToUpper(strings.TrimRight(secret, "="))
+	if n := len(s) % 8; n != 0 {
+		s += strings.Repeat("=", 8-n)
+	}
+	key, err := base32.StdEncoding.DecodeString(s)
 	if err != nil {
 		return "", fmt.Errorf("decode totp secret: %w", err)
 	}
