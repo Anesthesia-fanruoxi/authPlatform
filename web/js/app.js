@@ -546,6 +546,12 @@ const GrantsPage = {
             <el-checkbox :model-value="!!row.grants[p.id]" @change="(v) => toggle(row, p, v)" />
           </template>
         </el-table-column>
+        <el-table-column label="操作" width="150" align="center" fixed="right">
+          <template #default="{row}">
+            <el-button link type="primary" size="small" @click="grantAll(row)">全部授权</el-button>
+            <el-button link type="danger" size="small" @click="clearAll(row)">清空</el-button>
+          </template>
+        </el-table-column>
         <template #empty>
           <div class="table-empty">
             <span class="table-empty-ic">${svg('key')}</span>
@@ -624,7 +630,37 @@ const GrantsPage = {
       }
     }
 
-    return { platforms, matrixUsers, filteredUsers, filter, categoryFilter, categories, loading, tableHeight, boxRef, avatarStyle, load, toggle };
+    async function grantAll(row) {
+      if (!platforms.value.length) return;
+      try {
+        await ElMessageBox.confirm(`将「${row.username}」授权到全部 ${platforms.value.length} 个平台？`, '提示', { type: 'warning' });
+      } catch { return; }
+      const ids = platforms.value.map(p => p.id);
+      row.grants = {};
+      ids.forEach(id => { row.grants[id] = true; });
+      try {
+        await api.setUserGrants(row.id, ids);
+        ElMessage.success(`已授权「${row.username}」到全部平台`);
+      } catch (e) {
+        load(); // 回滚为服务端真实状态
+        ElMessage.error(e.message);
+      }
+    }
+    async function clearAll(row) {
+      try {
+        await ElMessageBox.confirm(`取消「${row.username}」的全部平台授权？`, '提示', { type: 'warning' });
+      } catch { return; }
+      row.grants = {};
+      try {
+        await api.setUserGrants(row.id, []);
+        ElMessage.success(`已清空「${row.username}」的授权`);
+      } catch (e) {
+        load();
+        ElMessage.error(e.message);
+      }
+    }
+
+    return { platforms, matrixUsers, filteredUsers, filter, categoryFilter, categories, loading, tableHeight, boxRef, avatarStyle, load, toggle, grantAll, clearAll };
   },
 };
 
