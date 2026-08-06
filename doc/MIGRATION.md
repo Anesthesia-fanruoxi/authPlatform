@@ -81,6 +81,9 @@ WHERE u.id IS NULL;
 > **⚠️ collation 冲突**：CMDB 表为 `utf8mb4_0900_ai_ci`，authPlatform 为 `utf8mb4_general_ci`，
 > JOIN 比较用户名时必须显式指定 collation（下方 SQL 已加 `COLLATE utf8mb4_general_ci`）；
 > 建临时表导入数据时建议一并指定 `COLLATE utf8mb4_general_ci` 或 `CONVERT TO CHARACTER SET utf8mb4`。
+>
+> **⚠️ 若用 GORM/ORM 工具导入**：`status=0`（禁用）是零值，GORM `Create` 默认跳过零值字段，
+> DB 会用默认值 1 导致禁用用户被导成启用——必须用 `db.Select("Status").Create(u)` 或 `Updates(map)` 方式写入。
 
 ## 3. 恢复码迁移（otp_backup_codes 表，MySQL 8+ JSON_TABLE）
 
