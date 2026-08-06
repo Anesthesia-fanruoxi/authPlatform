@@ -270,11 +270,13 @@ const UsersPage = {
       dlg.isEdit = false;
       dlg.form = { id: 0, username: '', nickname: '', category: '', phone: '', email: '', password: '' };
       dlg.visible = true;
+      loadCategories(); // 实时获取最新分类
     }
     function openEdit(row) {
       dlg.isEdit = true;
       dlg.form = { id: row.id, username: row.username, nickname: row.nickname, category: row.category || '', phone: row.phone || '', email: row.email || '', password: '' };
       dlg.visible = true;
+      loadCategories(); // 实时获取最新分类（分类可能被其他管理员修改）
     }
     async function save() {
       dlg.saving = true;
