@@ -40,6 +40,7 @@ func New(s *api.Server) http.Handler {
 	// 管理端：授权管理
 	mux.HandleFunc("GET /api/admin/grants", adminAuth(s.Users, s.Secret, s.GrantsMatrix))
 	mux.HandleFunc("POST /api/admin/users/{id}/grants", adminAuth(s.Users, s.Secret, s.SetUserGrants))
+	mux.HandleFunc("POST /api/admin/platforms/{id}/grants", adminAuth(s.Users, s.Secret, s.SetPlatformGrants))
 
 	// 管理端：审计日志
 	mux.HandleFunc("GET /api/admin/logs", adminAuth(s.Users, s.Secret, s.ListLogs))

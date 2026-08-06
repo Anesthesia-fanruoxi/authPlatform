@@ -31,6 +31,22 @@ func (s *GrantStore) SetForUser(ctx context.Context, userID int64, platformIDs [
 	})
 }
 
+// SetForPlatform 全量替换某平台可登录的用户集合（事务：先清后插）。
+func (s *GrantStore) SetForPlatform(ctx context.Context, platformID int64, userIDs []int64) error {
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("platform_id = ?", platformID).Delete(&model.UserPlatformGrant{}).Error; err != nil {
+			return err
+		}
+		for _, uid := range userIDs {
+			g := &model.UserPlatformGrant{UserID: uid, PlatformID: platformID, Status: 1}
+			if err := tx.Create(g).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
 func (s *GrantStore) GetByUser(ctx context.Context, userID int64) ([]*model.UserPlatformGrant, error) {
 	var list []*model.UserPlatformGrant
 	err := s.db.WithContext(ctx).Where("user_id = ?", userID).Find(&list).Error

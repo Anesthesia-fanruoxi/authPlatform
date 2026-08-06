@@ -80,6 +80,9 @@ const api = {
   setUserGrants(id, platform_ids) {
     return this.request('/api/admin/users/' + id + '/grants', { method: 'POST', body: JSON.stringify({ platform_ids }) });
   },
+  setPlatformGrants(id, user_ids) {
+    return this.request('/api/admin/platforms/' + id + '/grants', { method: 'POST', body: JSON.stringify({ user_ids }) });
+  },
   // 审计日志
   listLogs(params) {
     const q = new URLSearchParams();
@@ -542,6 +545,12 @@ const GrantsPage = {
           </template>
         </el-table-column>
         <el-table-column v-for="p in platforms" :key="p.id" :label="p.name" align="center" min-width="120">
+          <template #header>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+              <span>{{ p.name }}</span>
+              <el-checkbox :model-value="colState(p).checked" :indeterminate="colState(p).indeterminate" @change="(v) => toggleColumn(p, v)" />
+            </div>
+          </template>
           <template #default="{row}">
             <el-checkbox :model-value="!!row.grants[p.id]" @change="(v) => toggle(row, p, v)" />
           </template>
@@ -660,7 +669,34 @@ const GrantsPage = {
       }
     }
 
-    return { platforms, matrixUsers, filteredUsers, filter, categoryFilter, categories, loading, tableHeight, boxRef, avatarStyle, load, toggle, grantAll, clearAll };
+    // 列级全选状态：当前矩阵用户（含分类筛选）在该平台列的勾选情况（全勾选/部分/无）
+    function colState(p) {
+      const users = matrixUsers.value;
+      if (!users.length) return { checked: false, indeterminate: false };
+      let on = 0;
+      users.forEach(u => { if (u.grants[p.id]) on++; });
+      return { checked: on === users.length, indeterminate: on > 0 && on < users.length };
+    }
+    // 列级全选：一键授权/取消该平台对当前矩阵全部用户
+    async function toggleColumn(p, val) {
+      const users = matrixUsers.value;
+      if (!users.length) return;
+      const ids = users.map(u => u.id);
+      const scope = `当前 ${users.length} 个用户`;
+      try {
+        await ElMessageBox.confirm(
+          val ? `将平台「${p.name}」授权给${scope}？` : `取消平台「${p.name}」对${scope}的授权？`,
+          '提示', { type: 'warning' }
+        );
+      } catch { return; }
+      try {
+        await api.setPlatformGrants(p.id, val ? ids : []);
+        ElMessage.success(val ? `已授权「${p.name}」给 ${users.length} 个用户` : `已清空「${p.name}」的授权用户`);
+        load();
+      } catch (e) { ElMessage.error(e.message); }
+    }
+
+    return { platforms, matrixUsers, filteredUsers, filter, categoryFilter, categories, loading, tableHeight, boxRef, avatarStyle, load, toggle, grantAll, clearAll, colState, toggleColumn };
   },
 };
 

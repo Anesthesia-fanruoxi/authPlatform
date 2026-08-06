@@ -7,6 +7,38 @@ import (
 	"net/http"
 )
 
+// SetPlatformGrants POST /api/admin/platforms/{id}/grants
+// 全量替换某平台可登录的用户集合（列级批量授权）。
+func (s *Server) SetPlatformGrants(w http.ResponseWriter, r *http.Request) {
+	id, err := pathID(r)
+	if err != nil {
+		Fail(w, CodeBadParam, "参数错误")
+		return
+	}
+	var req struct {
+		UserIDs []int64 `json:"user_ids"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		Fail(w, CodeBadParam, "参数错误")
+		return
+	}
+	for _, uid := range req.UserIDs {
+		if _, err := s.Users.GetByID(r.Context(), uid); err != nil {
+			if errors.Is(err, common.ErrNotFound) {
+				Fail(w, CodeBadParam, "用户不存在")
+				return
+			}
+			s.internalError(w, err)
+			return
+		}
+	}
+	if err := s.Grants.SetForPlatform(r.Context(), id, req.UserIDs); err != nil {
+		s.internalError(w, err)
+		return
+	}
+	OK(w, nil)
+}
+
 // GrantsMatrix GET /api/admin/grants 返回授权矩阵数据（用户 × 平台 × 现有授权）。
 // 超级管理员不展示；支持 ?category= 按用户分类筛选（快捷授权）。
 func (s *Server) GrantsMatrix(w http.ResponseWriter, r *http.Request) {
