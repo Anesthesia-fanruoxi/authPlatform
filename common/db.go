@@ -62,7 +62,7 @@ func OpenDB(cfg *config.Config) (*gorm.DB, error) {
 	}
 
 	// 3. 按 model 定义建表（AutoMigrate）
-	if err := db.AutoMigrate(&model.User{}, &model.Platform{}, &model.UserPlatformGrant{}, &model.LoginLog{}, &model.SysSetting{}, &model.OTPBackupCode{}, &model.DesktopSession{}, &model.DesktopPending{}); err != nil {
+	if err := db.AutoMigrate(&model.User{}, &model.Platform{}, &model.UserPlatformGrant{}, &model.LoginLog{}, &model.SysSetting{}, &model.OTPBackupCode{}); err != nil {
 		return nil, fmt.Errorf("automigrate: %w", err)
 	}
 	return db, nil

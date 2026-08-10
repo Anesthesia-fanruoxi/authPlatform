@@ -1,8 +1,8 @@
 # authPlatform 接口文档（Web 调用调试版）
 
 > **用途**：用浏览器控制台 / Postman / Apifox 等 Web 工具调用认证中心接口、验证登录流程。
-> **完整接入规范**（平台签名协议、时序、桌面令牌登录）见 `doc/接入文档.md`。
-> **版本**：对应桌面令牌登录完成后的当前服务（:8080）。
+> **完整接入规范**（平台签名协议、时序、业务端对接）见 `doc/接入文档.md`。
+> **版本**：当前服务（:8080）。
 
 ## 1. 基础信息
 
@@ -34,8 +34,7 @@
 | 身份 | 认证方式 | 适用接口 |
 |---|---|---|
 | 管理端 | `Authorization: Bearer <admin_token>` | `/api/admin/*` |
-| 平台侧 | `X-Platform-Id` + `X-Timestamp` + `X-Sign`（HMAC 签名） | `/api/auth/*`、`/api/users*`、`desktop/initiate\|poll\|exchange` |
-| 客户端/桌面 | 无签名 | `desktop/login`、`desktop/confirm` |
+| 平台侧 | `X-Platform-Id` + `X-Timestamp` + `X-Sign`（HMAC 签名） | `/api/auth/*`、`/api/users*` |
 
 ### 平台签名算法（HMAC-SHA256）
 
@@ -143,37 +142,9 @@ Body: {"username":"alice","secret":"BASE32SECRET"}   # 平台侧绑定后回写�
 | GET | `/api/users?platform_id=` | 平台可登录用户列表（返回 uid/username/nickname/phone/email/totp_enabled 等） |
 | GET | `/api/users/{uid}` | 单用户详情 |
 
-### 4.5 桌面令牌登录（平台侧）
+## 5. Web 快速试登录（浏览器控制台可复制）
 
-| 方法 | 路径 | 说明 |
-|---|---|---|
-| POST | `/api/auth/desktop/initiate` | 发起：`{}` → `{"request_id","expires_in":60}` |
-| GET | `/api/auth/desktop/poll?request_id=` | 轮询：`{"status":"pending\|confirmed\|used\|expired"}` |
-| POST | `/api/auth/desktop/exchange` | 兑换：`{"request_id"}` → token（一次性） |
-
-> 平台侧还有 `change-password`、`update-profile`、`send-code` 等接口，见 `doc/接入文档.md` §4。
-
-## 5. 桌面客户端接口（无签名，Web 可直接调）
-
-### 5.1 客户端登录（最简单，推荐先试这个）
-
-```
-POST /api/auth/desktop/login
-Body: {"method":"username_totp","identifier":"用户名","credential":"6位TOTP"}
-或   : {"username":"用户名","password":"密码"}        # 默认用户名+密码
-响应: {"code":0,"data":{"desktop_token":"...","expires_at":"...","user":{"uid","username","nickname"}}}
-```
-
-### 5.2 客户端确认免密请求
-
-```
-POST /api/auth/desktop/confirm
-Body: {"desktop_token":"...","request_id":"..."}
-```
-
-## 6. Web 快速试登录（浏览器控制台可复制）
-
-### 6.1 管理员登录
+### 5.1 管理员登录
 
 ```js
 const r = await fetch('http://127.0.0.1:8080/api/admin/login', {
@@ -183,25 +154,7 @@ const r = await fetch('http://127.0.0.1:8080/api/admin/login', {
 console.log(r);                        // code=0，data.token 即管理端 Bearer
 ```
 
-### 6.2 桌面登录（无签名，最快验证账号可用）
-
-```js
-// 方式 A：用户名+密码
-const r1 = await fetch('http://127.0.0.1:8080/api/auth/desktop/login', {
-  method: 'POST', headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ username: 'alice', password: '你的密码' }),
-}).then(r => r.json());
-console.log(r1);
-
-// 方式 B：用户名 + TOTP（双因子用户）
-const r2 = await fetch('http://127.0.0.1:8080/api/auth/desktop/login', {
-  method: 'POST', headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ method: 'username_totp', identifier: 'wangdachui', credential: '6位动态码' }),
-}).then(r => r.json());
-console.log(r2);                       // code=0 -> data.desktop_token
-```
-
-### 6.3 平台签名登录（模拟平台转发）
+### 5.2 平台签名登录（模拟平台转发）
 
 > `method` 必须在该平台配置的 `login_methods` 内（管理后台「平台管理」可查）；返回 1007「当前第一步登录方式为 xxx」即签名已通过、仅方式不匹配，改用平台配置的方式即可。
 
@@ -214,9 +167,8 @@ const r = await fetch('http://127.0.0.1:8080' + PATH, { method: 'POST', headers,
 console.log(r);                        // code=0 -> data.token
 ```
 
-## 7. 常见问题
+## 6. 常见问题
 
 - **登录方式不匹配**：`verify` 的 `method` 必须在该平台配置的 `login_methods` 内（平台管理页配置）；`username_totp` 用户需已绑定 TOTP，否则返回"该账号未启用 TOTP"。
 - **签名失败 1001**：检查 secret 是否正确、`X-Timestamp` 是否 ±300s 内、签名串的 URI 是否与请求完全一致（含 query）、body 是否与签名时一致。
 - **限流 1005**：同一账号 5 次失败锁 15 分钟（账号维度）。
-- **desktop_token 仅返回一次**：丢失需重新 `desktop/login`。

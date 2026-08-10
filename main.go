@@ -30,7 +30,6 @@ func main() {
 	grants := common.NewGrantStore(db)
 	audit := common.NewAuditStore(db)
 	settings := common.NewSettingsStore(db)
-	desktop := common.NewDesktopStore(db)
 	if err := settings.EnsureDefaults(context.Background()); err != nil {
 		log.Fatalf("ensure settings: %v", err)
 	}
@@ -52,7 +51,6 @@ func main() {
 		Settings:  settings,
 		Tickets:   common.NewTicketStore(),
 		VerCodes:  common.NewVerCodeStore(),
-		Desktop:   desktop,
 		Secret:    cfg.TokenSecret,
 		MasterKey: cfg.MasterKey,
 		TokenTTL:  cfg.TokenTTL,
