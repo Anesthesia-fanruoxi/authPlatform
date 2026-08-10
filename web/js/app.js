@@ -850,7 +850,7 @@ const LogsPage = {
 
     function reasonText(reason) {
       const map = {
-        ok: '登录成功', step_ok: '步骤通过', bad_cred: '账号或密码错误', bad_code: '验证码错误',
+        ok: '登录成功', step_ok: '步骤通过', admin_login: '后台登录', desktop_ok: '桌面端登录', bad_cred: '账号或密码错误', bad_code: '验证码错误',
         bad_totp: 'TOTP 验证码错误', totp_disabled: '未启用TOTP', disabled: '账号已禁用',
         unauthorized: '未授权登录', locked: '登录被限流锁定', sign_invalid: '签名无效', ip_denied: 'IP不在白名单',
       };

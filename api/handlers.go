@@ -95,7 +95,7 @@ func (s *Server) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.Limiter.Reset(req.Username)
-	_ = s.Audit.WriteLogin(r.Context(), req.Username, "", 1, "ok", ip)
+	_ = s.Audit.WriteLogin(r.Context(), req.Username, "", 1, "admin_login", ip)
 	token, err := common.SignSessionToken(s.Secret, u.ID, s.TokenTTL)
 	if err != nil {
 		s.internalError(w, err)
