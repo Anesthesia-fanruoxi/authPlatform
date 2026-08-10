@@ -17,3 +17,4 @@ reasonix.toml
 *.exe~
 *.xlsx
 desktop/src-tauri/target/
+desktop/examples/__pycache__/
