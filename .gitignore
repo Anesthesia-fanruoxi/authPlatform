@@ -16,3 +16,4 @@ server.log
 reasonix.toml
 *.exe~
 *.xlsx
+desktop/src-tauri/target/

@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>authPlatform 令牌登录</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Microsoft YaHei', system-ui, sans-serif; background: #f5f7fb; height: 100vh; }
+    #app { max-width: 420px; margin: 0 auto; padding: 24px; }
+    .card { background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 4px 16px rgba(15,31,77,.06); }
+    .brand { text-align: center; margin-bottom: 20px; }
+    .brand .logo { width: 52px; height: 52px; border-radius: 14px; background: linear-gradient(135deg,#2f6fed,#5b8cff);
+      display: inline-flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 22px; }
+    .brand h1 { font-size: 18px; margin-top: 10px; color: #1d2b45; }
+    .brand p { font-size: 12px; color: #8a97ab; margin-top: 4px; }
+    label { display: block; font-size: 13px; color: #4a5a72; margin: 14px 0 6px; }
+    input, select { width: 100%; padding: 10px 12px; border: 1px solid #dbe3ef; border-radius: 8px; font-size: 14px; outline: none; }
+    input:focus { border-color: #2f6fed; }
+    button { width: 100%; padding: 11px; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; margin-top: 16px; }
+    .btn-primary { background: #2f6fed; color: #fff; }
+    .btn-primary:hover { background: #245bd0; }
+    .btn-ghost { background: #eef2f9; color: #4a5a72; margin-top: 8px; }
+    .status { text-align: center; font-size: 13px; color: #2f9e44; margin-top: 10px; }
+    .error { color: #e03131; }
+    .user-info { text-align: center; }
+    .avatar { width: 56px; height: 56px; border-radius: 50%; background: linear-gradient(135deg,#7a5cff,#2f6fed);
+      color: #fff; font-size: 24px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; }
+    .user-info h2 { font-size: 18px; margin-top: 12px; color: #1d2b45; }
+    .user-info p { font-size: 13px; color: #8a97ab; margin-top: 6px; }
+    .confirm-box { margin-top: 18px; border: 1px solid #e3ecff; background: #f0f5ff; border-radius: 10px; padding: 16px; text-align: center; }
+    .confirm-box h3 { font-size: 14px; color: #1d2b45; margin-bottom: 8px; }
+    .confirm-box p { font-size: 13px; color: #4a5a72; }
+    .hide { display: none; }
+    .tip { font-size: 12px; color: #8a97ab; margin-top: 14px; line-height: 1.8; }
+    .method-switch { text-align: right; font-size: 12px; color: #2f6fed; cursor: pointer; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div class="card">
+      <div class="brand">
+        <span class="logo">A</span>
+        <h1>authPlatform 令牌登录</h1>
+        <p>桌面统一登录 · 确认式免密访问平台</p>
+      </div>
+
+      <!-- 登录表单 -->
+      <div id="view-login">
+        <label>认证中心地址</label>
+        <input id="base-url" value="http://127.0.0.1:8080" placeholder="http://127.0.0.1:8080">
+        <label>用户名</label>
+        <input id="username" placeholder="请输入用户名">
+        <label id="cred-label">密码</label>
+        <input id="credential" type="password" placeholder="请输入">
+        <div class="method-switch" id="method-switch">切换为 TOTP 验证码</div>
+        <button class="btn-primary" id="btn-login">登录</button>
+        <div class="status" id="login-msg"></div>
+        <p class="tip">登录后本客户端持有桌面令牌，访问平台时选择「令牌登录」并在本窗口确认即可免密进入。</p>
+      </div>
+
+      <!-- 已登录主界面 -->
+      <div id="view-main" class="hide">
+        <div class="user-info">
+          <span class="avatar" id="avatar">?</span>
+          <h2 id="user-name">—</h2>
+          <p id="user-detail"></p>
+        </div>
+        <div class="confirm-box hide" id="confirm-box">
+          <h3>平台请求登录确认</h3>
+          <p id="confirm-text">正在等待确认…</p>
+          <button class="btn-primary" id="btn-confirm">确认登录</button>
+          <button class="btn-ghost" id="btn-reject">拒绝</button>
+        </div>
+        <div class="status" id="main-msg"></div>
+        <button class="btn-ghost" id="btn-logout">退出登录</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="vendor/vue.global.prod.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
