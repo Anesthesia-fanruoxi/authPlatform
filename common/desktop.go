@@ -117,8 +117,10 @@ func (s *DesktopStore) ConfirmPending(ctx context.Context, requestID string, use
 }
 
 // ConsumePending 消费请求（confirmed → used，平台换取 token 时调用，一次性）。
-func (s *DesktopStore) ConsumePending(ctx context.Context, requestID string) error {
-	return s.db.WithContext(ctx).Model(&model.DesktopPending{}).
+// 返回是否成功消费；并发下仅一个调用能成功（原子 UPDATE + RowsAffected 判定）。
+func (s *DesktopStore) ConsumePending(ctx context.Context, requestID string) (bool, error) {
+	res := s.db.WithContext(ctx).Model(&model.DesktopPending{}).
 		Where("request_id = ? AND status = ?", requestID, "confirmed").
-		Update("status", "used").Error
+		Update("status", "used")
+	return res.RowsAffected > 0, res.Error
 }

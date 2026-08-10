@@ -17,6 +17,7 @@ pub struct PendingInfo {
 pub struct AppState {
     pub session: Mutex<Option<session::Session>>,
     pub pending: Mutex<Option<PendingInfo>>,
+    pub last_push: Mutex<std::time::Instant>, // 推送节流（防弹窗轰炸）
 }
 
 /// 登录认证中心（账号/密码或 TOTP），成功后本地持久化会话。
@@ -77,6 +78,7 @@ pub fn run() {
         .manage(AppState {
             session: Mutex::new(session::load()),
             pending: Mutex::new(None),
+            last_push: Mutex::new(std::time::Instant::now() - std::time::Duration::from_secs(10)),
         })
         .setup(|app| {
             let handle: AppHandle = app.handle().clone();

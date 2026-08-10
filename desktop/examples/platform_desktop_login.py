@@ -71,7 +71,6 @@ def push_to_client(request_id):
     if not identity.get("logged_in"):
         print("[2] 桌面客户端未登录，请先打开客户端登录")
         return None
-    user = identity["user"]
     try:
         resp = requests.post(
             f"http://127.0.0.1:{CLIENT_PORT}/pending",
@@ -82,8 +81,8 @@ def push_to_client(request_id):
     except Exception as e:
         print("[2] 推送失败:", e)
         return None
-    print(f"[2] 已推送确认请求到桌面客户端（用户：{user.get('nickname') or user.get('username')}）")
-    return user
+    print("[2] 已推送确认请求到桌面客户端，等待用户在客户端确认")
+    return True
 
 
 def wait_confirmed(request_id, timeout=60):

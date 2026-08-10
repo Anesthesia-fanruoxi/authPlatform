@@ -39,7 +39,7 @@ async function refreshPending() {
     const box = document.getElementById('confirm-box');
     if (p) {
       document.getElementById('confirm-text').textContent =
-        `平台「${p.platform || '未知平台'}」请求以当前账号身份登录，是否确认？`;
+        `平台「${p.platform || '未知平台'}」请求以当前账号身份登录（请求号 ${(p.request_id || '').slice(0, 8)}），是否确认？`;
       box.classList.remove('hide');
       setMsg('#main-msg', '');
     } else {

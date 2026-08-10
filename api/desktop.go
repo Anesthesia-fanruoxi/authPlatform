@@ -267,8 +267,13 @@ func (s *Server) DesktopExchange(w http.ResponseWriter, r *http.Request) {
 		Fail(w, CodeUnauthorized, "该用户未授权登录此平台")
 		return
 	}
-	if err := s.Desktop.ConsumePending(r.Context(), req.RequestID); err != nil {
+	consumed, err := s.Desktop.ConsumePending(r.Context(), req.RequestID)
+	if err != nil {
 		s.internalError(w, err)
+		return
+	}
+	if !consumed {
+		Fail(w, CodeBadParam, "请求已被使用")
 		return
 	}
 	_ = s.Audit.WriteLogin(r.Context(), u.Username, p.PlatformID, 1, "desktop_ok", clientIP(r))
