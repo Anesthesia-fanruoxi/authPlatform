@@ -18,6 +18,7 @@ type Server struct {
 	Settings  *common.SettingsStore // 系统设置（密码策略/限流/登录方式/后台IP白名单）
 	Tickets   *common.TicketStore   // 多步骤登录临时票据
 	VerCodes  *common.VerCodeStore  // 登录验证码（dev 模式）
+	Desktop   *common.DesktopStore  // 桌面会话与免密登录待确认请求
 	Secret    string
 	MasterKey string
 	TokenTTL  time.Duration

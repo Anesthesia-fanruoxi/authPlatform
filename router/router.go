@@ -54,6 +54,14 @@ func New(s *api.Server) http.Handler {
 	mux.HandleFunc("POST /api/auth/update-profile", s.UpdateProfile)
 	// 平台侧：双因子绑定由平台完成，认证中心只接收存储 TOTP 密钥（登录校验仍走 verify）
 	mux.HandleFunc("POST /api/auth/totp/save", s.SaveTOTP)
+
+	// 桌面令牌登录（客户端侧，无平台签名）
+	mux.HandleFunc("POST /api/auth/desktop/login", s.DesktopLogin)
+	mux.HandleFunc("POST /api/auth/desktop/confirm", s.DesktopConfirm)
+	// 桌面令牌登录（平台侧，handler 内验平台签名）
+	mux.HandleFunc("POST /api/auth/desktop/initiate", s.DesktopInitiate)
+	mux.HandleFunc("GET /api/auth/desktop/poll", s.DesktopPoll)
+	mux.HandleFunc("POST /api/auth/desktop/exchange", s.DesktopExchange)
 	mux.HandleFunc("GET /api/users/{uid}", s.GetUserByUID)
 	mux.HandleFunc("GET /api/users", s.ListUsersForPlatform)
 
