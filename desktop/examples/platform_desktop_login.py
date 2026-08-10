@@ -11,6 +11,9 @@
 
 依赖：pip install requests
 配套：认证中心需已启动；桌面客户端需已启动并登录（desktop/，Tauri）。
+注意：本脚本把「探测/推送客户端」也放在后端，仅适用于**开发机本机演示**（认证中心、客户端、平台脚本同机）。
+      真实部署中 5712 在用户浏览器所在电脑上，探测与推送必须由**平台前端 JS** 完成，
+      带 secret 的 initiate/poll/exchange 仍由平台后端完成——完整示例见 platform_integration.md。
 """
 import hashlib
 import hmac
