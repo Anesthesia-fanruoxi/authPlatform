@@ -6,13 +6,27 @@
 >
 > ```
 > 旧：平台(持 secret, 签名) ──► 认证中心
-> 新：平台(零配置) ──► 桌面端(持有各平台 secret, 封装签名) ──► 认证中心
+> 新：平台登录环节 ──► 桌面端(持有各平台 secret, 封装签名) ──► 认证中心
 > ```
 >
 > 好处：
-> 1. **所有平台都能通过桌面端快捷登录**——平台只要调桌面端本地接口，无需关心认证中心。
-> 2. **签名逻辑全部封装在桌面端**——各平台的 secret、HMAC 签名、initiate/confirm/exchange 流程都在桌面端内部完成，平台不再接触加密盐等敏感逻辑。
-> 3. **平台零配置**——平台不需要注册 secret、不需要实现签名，配置全部在桌面端（桌面端持有「平台ID + secret + 认证中心地址」）。
+> 1. **所有平台都能通过桌面端快捷登录**——平台只要调桌面端本地接口，无需关心认证中心签名。
+> 2. **签名逻辑全部封装在桌面端**——登录环节的 secret、HMAC 签名、initiate/confirm/exchange 流程都在桌面端内部完成，平台前端/后端不再接触登录相关加密盐。
+> 3. **减少平台配置**——登录环节平台零配置，secret 由桌面端登录后自动从认证中心拉取。
+>
+> ## ⚠️ 重要边界：平台后端仍需一个 secret（用于用户数据同步）
+>
+> 「平台零配置」**仅指登录环节**。平台后端如果要**拉取用户列表/同步用户**（`GET /api/users`、`GET /api/users/{uid}`）、校验 token 等**服务器到服务器**的调用，
+> **平台后端仍必须持有自己在认证中心的 secret 签名**——这类调用发生在平台服务器上，与用户电脑上的桌面端无关，桌面端无法代理。
+>
+> 两个 secret 分工明确：
+>
+> | secret | 持有方 | 用途 | 能否省 |
+> |---|---|---|---|
+> | 登录代理 secret | 桌面端（登录后自动拉取） | 替平台走 initiate/confirm/exchange 登录流程 | 可省（平台侧不配） |
+> | 数据同步 secret | 平台后端 | 用户列表拉取/同步、token 校验 | **不可省**（服务器调用必须自签） |
+>
+> 平台后端的数据同步流程见 `doc/接入文档.md` §7（synced_users 同步）。
 
 ## 时序总览（同步响应）
 
@@ -92,31 +106,22 @@ def create_session():
     return jsonify(ok=True, user=user)
 ```
 
-## 三、桌面端（认证中心接入配置示例）
+## 三、桌面端配置（登录后自动拉取授权平台）
 
-桌面端本地配置（`%APPDATA%/authplatform-desktop/platforms.json`）持有各平台的接入参数，
-平台本身不再需要任何配置：
+桌面端登录认证中心后，自动向认证中心拉取「当前用户被授权的平台列表 + 各平台登录代理 secret」，无需手动配置：
 
-```json
-{
-  "auth_base": "http://authplatform.example.com",
-  "platforms": [
-    {
-      "platform_id": "ops-platforms",
-      "name": "运维平台",
-      "secret": "e2edb44d…（认证中心签发给该平台的 secret）"
-    },
-    {
-      "platform_id": "data-platform",
-      "name": "数据平台",
-      "secret": "…"
-    }
-  ]
-}
+```
+桌面端登录（desktop/login，desktop_token）
+   └─► 认证中心新增接口：GET /api/auth/desktop/platforms
+        （凭 desktop_token 会话身份）
+        ◀─ [{platform_id, name, secret(登录代理用)}, ...]
 ```
 
-桌面端收到平台 `POST /login` 时：按 `platform_id` 取配置 → 签名 `initiate` → 弹确认窗 →
+桌面端收到平台 `POST /login` 时：按 `platform_id` 在已拉取的列表里找配置 → 签名 `initiate` → 弹确认窗 →
 用户确认 → `confirm` → `exchange` → 把 token 同步返回给平台页面。
+
+> 该接口属于新架构的认证中心配套需求（桌面端以客户端身份拉取，非平台签名身份）。
+> 注意：这里下发的 secret 仅用于**登录代理**；平台后端做用户同步仍使用自己在认证中心注册的 secret。
 
 ## 四、认证中心视角
 
