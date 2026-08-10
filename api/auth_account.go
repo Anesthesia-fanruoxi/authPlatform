@@ -121,6 +121,7 @@ func (s *Server) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	updates := map[string]any{}
 	if req.Nickname != "" {
 		updates["nickname"] = req.Nickname
+		updates["nickname_pinyin"] = common.Pinyin(req.Nickname)
 	}
 	// email/phone：nil 不改；空串清空（存 NULL，不参与唯一约束）；非空做唯一冲突预检查
 	if req.Email != nil {

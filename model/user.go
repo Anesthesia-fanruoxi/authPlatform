@@ -8,7 +8,8 @@ type User struct {
 	UID          string    `gorm:"size:32;uniqueIndex;not null" json:"uid"`
 	Username     string    `gorm:"size:64;uniqueIndex;not null" json:"username"`
 	PasswordHash string    `gorm:"size:255;not null" json:"-"`
-	Nickname     string    `gorm:"size:64;default:''" json:"nickname"`
+	Nickname         string    `gorm:"size:64;default:''" json:"nickname"`
+	NicknamePinyin   string    `gorm:"size:128;default:''" json:"nickname_pinyin"`
 	// Phone/Email 可空（NULL 不参与唯一约束，允许空值重复）
 	Phone        *string   `gorm:"size:20;uniqueIndex" json:"phone"`
 	Email        *string   `gorm:"size:128;uniqueIndex" json:"email"`
@@ -39,7 +40,8 @@ func (u *User) SafeUser() map[string]any {
 		"id":           u.ID,
 		"uid":          u.UID,
 		"username":     u.Username,
-		"nickname":     u.Nickname,
+		"nickname":        u.Nickname,
+		"nickname_pinyin": u.NicknamePinyin,
 		"phone":        phone,
 		"email":        email,
 		"totp_enabled": u.TOTPEnabled,

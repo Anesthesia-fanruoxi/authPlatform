@@ -9,7 +9,9 @@ import (
 	"authplatform/api"
 	"authplatform/common"
 	"authplatform/config"
+	"authplatform/model"
 	"authplatform/router"
+	"gorm.io/gorm"
 )
 
 func main() {
@@ -33,6 +35,7 @@ func main() {
 	if err := settings.EnsureDefaults(context.Background()); err != nil {
 		log.Fatalf("ensure settings: %v", err)
 	}
+	backfillPinyin(db)
 	if err := common.EnsureAdmin(context.Background(), users, cfg.AdminUsername, cfg.AdminPassword); err != nil {
 		log.Fatalf("ensure admin: %v", err)
 	}
@@ -60,5 +63,25 @@ func main() {
 	log.Printf("authPlatform listening on %s", cfg.Addr)
 	if err := srv.ListenAndServe(); err != nil {
 		log.Fatalf("server: %v", err)
+	}
+}
+
+// backfillPinyin 存量数据回填：为昵称非空但 nickname_pinyin 为空的用户补算拼音（幂等，启动后执行一次）。
+func backfillPinyin(db *gorm.DB) {
+	var users []model.User
+	if err := db.Where("nickname <> '' AND nickname_pinyin = ''").Find(&users).Error; err != nil {
+		log.Printf("[backfill] query users: %v", err)
+		return
+	}
+	for _, u := range users {
+		p := common.Pinyin(u.Nickname)
+		if err := db.Model(&u).Update("nickname_pinyin", p).Error; err != nil {
+			log.Printf("[backfill] update user %s: %v", u.Username, err)
+			continue
+		}
+		log.Printf("[backfill] %s nickname=%q → pinyin=%q", u.Username, u.Nickname, p)
+	}
+	if n := len(users); n > 0 {
+		log.Printf("[backfill] 完成回填 %d 个用户", n)
 	}
 }

@@ -98,6 +98,7 @@ func userWhitelist(u *model.User) map[string]any {
 		"uid":        u.UID,
 		"username":   u.Username,
 		"nickname":   u.Nickname,
+		"nickname_pinyin": u.NicknamePinyin,
 		"phone":      phone,
 		"email":      email,
 		"status":     u.Status,

@@ -107,6 +107,7 @@ func (s *Server) CreateUser(w http.ResponseWriter, r *http.Request) {
 		Username:     req.Username,
 		PasswordHash: hash,
 		Nickname:     req.Nickname,
+		NicknamePinyin: common.Pinyin(req.Nickname),
 		Phone:        emptyToNil(req.Phone),
 		Email:        emptyToNil(req.Email),
 		Category:     req.Category,
@@ -144,6 +145,7 @@ func (s *Server) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	updates := map[string]any{}
 	if req.Nickname != nil {
 		updates["nickname"] = *req.Nickname
+		updates["nickname_pinyin"] = common.Pinyin(*req.Nickname)
 	}
 	if req.Phone != nil {
 		updates["phone"] = emptyToNilExpr(*req.Phone)
