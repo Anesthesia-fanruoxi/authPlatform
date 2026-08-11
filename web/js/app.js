@@ -41,6 +41,11 @@ const api = {
     const resp = await fetch(path, { ...options, headers });
     const body = await resp.json();
     if (body.code !== 0) {
+      // token 过期/未登录：清掉本地 token 并通知 Root 切回登录页
+      if (body.code === 1006) {
+        localStorage.removeItem('token');
+        window.dispatchEvent(new CustomEvent('auth-expired'));
+      }
       const err = new Error(body.msg || '请求失败');
       err.code = body.code;
       throw err;
@@ -1286,6 +1291,12 @@ const Root = {
       finally { mePwdDlg.saving = false; }
     }
     onMounted(async () => {
+      // 任何接口返回 1006（token 过期/未登录）→ 清用户态回登录页
+      window.addEventListener('auth-expired', () => {
+        user.value = {};
+        route.value = '/users';
+        location.hash = '';
+      });
       const token = localStorage.getItem('token');
       if (!token) return;
       try {
