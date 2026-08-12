@@ -499,8 +499,8 @@ const PlatformsPage = {
           </el-radio-group>
         </el-form-item>
         <el-form-item label="登录方式">
-          <el-checkbox-group v-model="dlg.form.login_methods" style="display:flex;flex-wrap:wrap;gap:8px">
-            <el-checkbox v-for="m in methodOptions" :key="m.value" :label="m.value" style="width:230px">{{ m.label }}</el-checkbox>
+          <el-checkbox-group v-model="dlg.form.login_methods" style="display:flex;flex-direction:column;gap:8px">
+            <el-checkbox v-for="m in methodOptions" :key="m.value" :label="m.value">{{ m.label }}</el-checkbox>
           </el-checkbox-group>
           <div class="settings-tip">留空 = 使用系统设置中的「新平台默认登录方式」；单次登录多选 = 任一方式通过即可；二次验证必须勾选 2 个，按勾选顺序逐步验证（如 密码 → 用户名+TOTP）。</div>
         </el-form-item>
