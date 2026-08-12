@@ -2,9 +2,12 @@
 package router
 
 import (
+	"bytes"
 	"context"
+	"io"
 	"io/fs"
 	"log"
+	"net"
 	"net/http"
 	"path"
 	"strings"
@@ -45,6 +48,7 @@ func New(s *api.Server) http.Handler {
 
 	// 管理端：审计日志
 	mux.HandleFunc("GET /api/admin/logs", adminAuth(s.Users, s.Secret, s.ListLogs))
+	mux.HandleFunc("GET /api/admin/request-logs", adminAuth(s.Users, s.Secret, s.ListRequestLogs))
 
 	// 平台侧：登录校验与用户信息拉取（平台签名认证）
 	mux.HandleFunc("POST /api/auth/verify", s.Verify)
@@ -68,7 +72,7 @@ func New(s *api.Server) http.Handler {
 
 	mux.HandleFunc("/", serveWeb) // 静态页兜底（未匹配到具体路由的请求）
 
-	return withRecovery(withLogging(mux))
+	return withRecovery(withRequestLog(s.Audit, withLogging(mux)))
 }
 
 // adminAuth 管理后台鉴权中间件：仅允许「有效管理会话 token + 账号为管理员且启用」的用户通过。
@@ -148,6 +152,45 @@ func withLogging(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 		log.Printf("%s %s %s", r.Method, r.URL.Path, time.Since(start))
 	})
+}
+
+// withRequestLog 全量请求日志：所有 /api/* 请求（含 GET 无参数）记录 方法/路径/query/请求头/请求体/IP/HTTP 状态码。
+// body 读取后回填，不影响后续 handler 消费；静态资源（/js /vendor 等非 /api 前缀）不记录。
+func withRequestLog(audit *common.AuditStore, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.HasPrefix(r.URL.Path, "/api/") {
+			next.ServeHTTP(w, r)
+			return
+		}
+		body, _ := io.ReadAll(r.Body)
+		r.Body = io.NopCloser(bytes.NewReader(body)) // 回填，后续 handler 可再读
+		headers := common.SanitizeRequestHeaders(r.Header)
+		sanitizedBody := common.SanitizeRequestBody(body)
+		platformID := r.Header.Get("X-Platform-Id")
+		sw := &statusWriter{ResponseWriter: w, status: http.StatusOK}
+		next.ServeHTTP(sw, r)
+		_ = audit.WriteRequest(r.Context(), r.Method, r.URL.Path, r.URL.RawQuery, platformID, clientIP(r), headers, sanitizedBody, sw.status)
+	})
+}
+
+// statusWriter 捕获写入的 HTTP 状态码（默认 200）。
+type statusWriter struct {
+	http.ResponseWriter
+	status int
+}
+
+func (w *statusWriter) WriteHeader(code int) {
+	w.status = code
+	w.ResponseWriter.WriteHeader(code)
+}
+
+// clientIP 从 RemoteAddr 提取客户端 IP。
+func clientIP(r *http.Request) string {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
 }
 
 // withRecovery 捕获 panic 并返回统一内部错误。
