@@ -492,18 +492,14 @@ const PlatformsPage = {
         <el-form-item label="IP 白名单">
           <el-input v-model="dlg.form.ip_whitelist" placeholder='JSON 数组，如 ["1.2.3.4"]，留空不限制' />
         </el-form-item>
+        <el-form-item label="验证模式">
+          <el-segmented v-model="dlg.form.auth_mode" :options="authModeOptions" style="width:100%" />
+        </el-form-item>
         <el-form-item label="登录方式">
-          <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
-            <span style="color:#5a6b82;font-size:13px;white-space:nowrap">验证模式</span>
-            <el-radio-group v-model="dlg.form.auth_mode">
-              <el-radio-button value="single">单次登录（任一即可）</el-radio-button>
-              <el-radio-button value="two_step">二次验证（按顺序）</el-radio-button>
-            </el-radio-group>
-          </div>
           <el-checkbox-group v-model="dlg.form.login_methods" style="display:flex;flex-wrap:wrap;gap:8px">
             <el-checkbox v-for="m in methodOptions" :key="m.value" :label="m.value" style="width:230px">{{ m.label }}</el-checkbox>
           </el-checkbox-group>
-          <div class="settings-tip">留空 = 使用系统设置中的「新平台默认登录方式」；单次登录多选 = 任一方式通过即可；二次验证多选 = 按勾选顺序逐步验证（如 密码 → 用户名+TOTP）。</div>
+          <div class="settings-tip">留空 = 使用系统设置中的「新平台默认登录方式」；单次登录多选 = 任一方式通过即可；二次验证必须勾选 2 个，按勾选顺序逐步验证（如 密码 → 用户名+TOTP）。</div>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -530,6 +526,10 @@ const PlatformsPage = {
     const dlg = reactive({ visible: false, isEdit: false, saving: false, form: { id: 0, platform_id: '', name: '', ip_whitelist: '', login_methods: [], auth_mode: 'two_step' } });
     const secretDlg = reactive({ visible: false, secret: '' });
     const methodOptions = LOGIN_METHOD_OPTIONS;
+    const authModeOptions = [
+      { label: '单次登录（任一即可）', value: 'single' },
+      { label: '二次验证（按顺序）', value: 'two_step' },
+    ];
 
     async function load() {
       loading.value = true;
@@ -552,6 +552,10 @@ const PlatformsPage = {
       dlg.visible = true;
     }
     async function save() {
+      if (dlg.form.auth_mode === 'two_step' && dlg.form.login_methods.length < 2) {
+        ElMessage.warning('二次验证需至少勾选 2 个登录方式（按勾选顺序逐步验证）');
+        return;
+      }
       dlg.saving = true;
       try {
         if (dlg.isEdit) {
@@ -606,7 +610,7 @@ const PlatformsPage = {
       } catch { ElMessage.warning('复制失败，请手动选择复制'); }
     }
 
-    return { platforms, loading, tableHeight, boxRef, dlg, secretDlg, methodOptions, loginMethodLabel, load, openCreate, openEdit, save, toggleStatus, rotate, del, copySecret };
+    return { platforms, loading, tableHeight, boxRef, dlg, secretDlg, methodOptions, authModeOptions, loginMethodLabel, load, openCreate, openEdit, save, toggleStatus, rotate, del, copySecret };
   },
 };
 
