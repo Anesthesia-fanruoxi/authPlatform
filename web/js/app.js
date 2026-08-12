@@ -907,7 +907,8 @@ const LogsPage = {
     function reasonText(reason) {
       const map = {
         ok: '登录成功', step_ok: '步骤通过', admin_login: '后台登录', desktop_ok: '桌面端登录', bad_cred: '账号或密码错误', bad_code: '验证码错误',
-        bad_totp: 'TOTP 验证码错误', totp_disabled: '未启用TOTP', disabled: '账号已禁用',
+        bad_totp: 'TOTP 验证码错误', totp_disabled: '未启用TOTP', disabled: '账号已禁用', bad_param: '参数错误', banned: '已拉黑',
+        code_sent: '验证码已发送', ban_add: '拉黑', ban_unlock: '解除拉黑',
         unauthorized: '未授权登录', locked: '登录被限流锁定', sign_invalid: '签名无效', ip_denied: 'IP不在白名单',
       };
       return map[reason] || reason;
