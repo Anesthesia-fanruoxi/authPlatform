@@ -169,6 +169,15 @@
   .plat-secret code { font-family:Consolas,Menlo,monospace; color:#5a6b82; }
   .plat-actions { margin-top:12px; padding-top:12px; border-top:1px solid #f2f5fa; display:flex; gap:2px; }
   .plat-empty { grid-column:1/-1; text-align:center; padding:60px 0; color:#8a97ab; }
+
+  /* 启动加载态 */
+  .boot-loading { position:fixed; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    background:#f5f7fb; z-index:2000; gap:12px; }
+  .boot-logo { width:52px; height:52px; border-radius:14px; background:linear-gradient(135deg,#2f6fed,#5b8cff);
+    display:inline-flex; align-items:center; justify-content:center; color:#fff; font-size:24px; font-weight:700;
+    box-shadow:0 6px 18px rgba(47,111,237,.3); animation:bootPulse 1.2s ease-in-out infinite; }
+  .boot-loading p { color:#8a97ab; font-size:13px; }
+  @keyframes bootPulse { 0%,100%{ transform:scale(1); opacity:1; } 50%{ transform:scale(.92); opacity:.85; } }
 </style>
 </head>
 <body>

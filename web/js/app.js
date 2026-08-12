@@ -1138,8 +1138,13 @@ const SettingsPage = {
 // ---------- 根组件（登录 + 布局） ----------
 const Root = {
   template: `
+    <!-- 启动校验：验证 token 前不渲染登录页（避免刷新闪现） -->
+    <div v-if="booting" class="boot-loading">
+      <span class="boot-logo">A</span>
+      <p>authPlatform 加载中…</p>
+    </div>
     <!-- 未登录：登录页 -->
-    <div v-if="!user.uid" class="login-wrap">
+    <div v-else-if="!user.uid" class="login-wrap">
       <div class="login-grid"></div>
       <div class="login-card">
         <div class="login-brand">
@@ -1225,6 +1230,7 @@ const Root = {
   `,
   setup() {
     const user = ref({});
+    const booting = ref(true); // 启动校验中：不渲染登录页，避免刷新闪现
     const username = ref('');
     const password = ref('');
     const loading = ref(false);
@@ -1300,15 +1306,20 @@ const Root = {
         route.value = '/users';
         location.hash = '';
       });
+      // 启动：先验证 token 再决定显示登录页或主界面（避免刷新闪现登录页）
       const token = localStorage.getItem('token');
-      if (!token) return;
+      if (!token) {
+        booting.value = false;
+        return;
+      }
       try {
         user.value = await api.me();
       }
       catch { localStorage.removeItem('token'); }
+      booting.value = false;
     });
 
-    return { user, username, password, loading, mePwdDlg, route, pageComponent, pageNames, pageTitle, onMenu, doLogin, logout, onHdrCmd, saveMePwd };
+    return { user, booting, username, password, loading, mePwdDlg, route, pageComponent, pageNames, pageTitle, onMenu, doLogin, logout, onHdrCmd, saveMePwd };
   },
 };
 
