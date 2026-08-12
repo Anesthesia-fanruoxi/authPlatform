@@ -476,7 +476,7 @@ const PlatformsPage = {
       </div>
     </el-card>
 
-    <el-dialog v-model="dlg.visible" :title="dlg.isEdit ? '编辑平台' : '注册平台'" width="460" align-center>
+    <el-dialog v-model="dlg.visible" :title="dlg.isEdit ? '编辑平台' : '注册平台'" width="640" align-center>
       <el-form label-width="100px">
         <el-form-item label="平台标识">
           <el-input v-model="dlg.form.platform_id" :disabled="dlg.isEdit" placeholder="如 ops-platform" />
@@ -486,15 +486,15 @@ const PlatformsPage = {
           <el-input v-model="dlg.form.ip_whitelist" placeholder='JSON 数组，如 ["1.2.3.4"]，留空不限制' />
         </el-form-item>
         <el-form-item label="登录方式">
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
             <span style="color:#5a6b82;font-size:13px;white-space:nowrap">验证模式</span>
-            <el-select v-model="dlg.form.auth_mode" style="width:170px">
-              <el-option value="single" label="单次登录（任一即可）" />
-              <el-option value="two_step" label="二次验证（按顺序）" />
-            </el-select>
+            <el-radio-group v-model="dlg.form.auth_mode">
+              <el-radio-button value="single">单次登录（任一即可）</el-radio-button>
+              <el-radio-button value="two_step">二次验证（按顺序）</el-radio-button>
+            </el-radio-group>
           </div>
-          <el-checkbox-group v-model="dlg.form.login_methods" style="display:flex;flex-direction:column;gap:8px">
-            <el-checkbox v-for="m in methodOptions" :key="m.value" :label="m.value">{{ m.label }}</el-checkbox>
+          <el-checkbox-group v-model="dlg.form.login_methods" style="display:flex;flex-wrap:wrap;gap:8px">
+            <el-checkbox v-for="m in methodOptions" :key="m.value" :label="m.value" style="width:230px">{{ m.label }}</el-checkbox>
           </el-checkbox-group>
           <div class="settings-tip">留空 = 使用系统设置中的「新平台默认登录方式」；单次登录多选 = 任一方式通过即可；二次验证多选 = 按勾选顺序逐步验证（如 密码 → 用户名+TOTP）。</div>
         </el-form-item>
