@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"log"
 	"net/http"
 	"time"
@@ -37,8 +38,16 @@ type LoginRequest struct {
 // Login 管理端登录：仅 is_admin 用户可登录；失败统一返回 1003 以隐藏账号存在性。
 // 支持后台登录 IP 白名单（sys_settings.admin_ip_whitelist，空=不限制）。
 func (s *Server) Login(w http.ResponseWriter, r *http.Request) {
+	body, _ := io.ReadAll(r.Body)
+	// 请求头/请求体（脱敏）随审计记录：管理端登录成功/失败/参数错/IP 拒绝都留痕
+	reqHeaders := common.SanitizeRequestHeaders(r.Header)
+	reqBody := common.SanitizeRequestBody(body)
+	audit := func(username string, success int, reason string) {
+		_ = s.Audit.WriteLoginDetail(r.Context(), username, "", success, reason, clientIP(r), reqHeaders, reqBody)
+	}
 	var req LoginRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Username == "" || req.Password == "" {
+	if err := json.Unmarshal(body, &req); err != nil || req.Username == "" || req.Password == "" {
+		audit("", 0, "bad_param")
 		Fail(w, CodeBadParam, "参数错误")
 		return
 	}
@@ -46,18 +55,18 @@ func (s *Server) Login(w http.ResponseWriter, r *http.Request) {
 	// 后台登录 IP 白名单（内网限制；未配置则不限制）
 	wl := s.Settings.GetAdminIPWhitelist(r.Context())
 	if len(wl.IPs) > 0 && !ipInList(ip, wl.IPs) {
-		_ = s.Audit.WriteLogin(r.Context(), req.Username, "", 0, "ip_denied", ip)
+		audit(req.Username, 0, "ip_denied")
 		Fail(w, CodeIPDenied, "IP 不在后台登录白名单")
 		return
 	}
 	// 登录限流 + 黑名单（账号维度）
 	if err := s.Limiter.Check(req.Username); err != nil {
 		if errors.Is(err, common.ErrBanned) {
-			_ = s.Audit.WriteLogin(r.Context(), req.Username, "", 0, "banned", ip)
+			audit(req.Username, 0, "banned")
 			Fail(w, CodeLocked, err.Error())
 			return
 		}
-		_ = s.Audit.WriteLogin(r.Context(), req.Username, "", 0, "locked", ip)
+		audit(req.Username, 0, "locked")
 		Fail(w, CodeLocked, err.Error())
 		return
 	}
@@ -65,7 +74,7 @@ func (s *Server) Login(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if errors.Is(err, common.ErrNotFound) {
 			s.Limiter.RecordFail(req.Username)
-			_ = s.Audit.WriteLogin(r.Context(), req.Username, "", 0, "bad_cred", ip)
+			audit(req.Username, 0, "bad_cred")
 			Fail(w, CodeBadCred, "账号或密码错误")
 			return
 		}
@@ -74,7 +83,7 @@ func (s *Server) Login(w http.ResponseWriter, r *http.Request) {
 	}
 	if !u.IsAdmin {
 		s.Limiter.RecordFail(req.Username)
-		_ = s.Audit.WriteLogin(r.Context(), req.Username, "", 0, "bad_cred", ip)
+		audit(req.Username, 0, "bad_cred")
 		Fail(w, CodeBadCred, "账号或密码错误")
 		return
 	}
@@ -85,17 +94,17 @@ func (s *Server) Login(w http.ResponseWriter, r *http.Request) {
 	}
 	if !ok {
 		s.Limiter.RecordFail(req.Username)
-		_ = s.Audit.WriteLogin(r.Context(), req.Username, "", 0, "bad_cred", ip)
+		audit(req.Username, 0, "bad_cred")
 		Fail(w, CodeBadCred, "账号或密码错误")
 		return
 	}
 	if u.Status != 1 {
-		_ = s.Audit.WriteLogin(r.Context(), req.Username, "", 0, "disabled", ip)
+		audit(req.Username, 0, "disabled")
 		Fail(w, CodeDisabled, "账号已禁用")
 		return
 	}
 	s.Limiter.Reset(req.Username)
-	_ = s.Audit.WriteLogin(r.Context(), req.Username, "", 1, "admin_login", ip)
+	audit(req.Username, 1, "admin_login")
 	token, err := common.SignSessionToken(s.Secret, u.ID, s.TokenTTL)
 	if err != nil {
 		s.internalError(w, err)

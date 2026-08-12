@@ -291,8 +291,15 @@ func (s *Server) SendCode(w http.ResponseWriter, r *http.Request) {
 		Fail(w, CodeBadParam, "参数错误")
 		return
 	}
+	// 发码也是登录链路的一环：任何结果（签名无效/参数错误/发码成功等）都留痕
+	reqHeaders := common.SanitizeRequestHeaders(r.Header)
+	reqBody := common.SanitizeRequestBody(body)
+	auditAll := func(username, platformID string, success int, reason string) {
+		_ = s.Audit.WriteLoginDetail(r.Context(), username, platformID, success, reason, clientIP(r), reqHeaders, reqBody)
+	}
 	p, ok := s.verifyPlatformRequest(w, r, body)
 	if !ok {
+		auditAll("", "", 0, "sign_invalid")
 		return
 	}
 	var req struct {
@@ -301,12 +308,14 @@ func (s *Server) SendCode(w http.ResponseWriter, r *http.Request) {
 		Identifier string `json:"identifier"`
 	}
 	if err := json.Unmarshal(body, &req); err != nil || req.Identifier == "" {
+		auditAll("", p.PlatformID, 0, "bad_param")
 		Fail(w, CodeBadParam, "参数错误")
 		return
 	}
 	switch req.Method {
 	case common.LoginMethodPhoneCode:
 	default:
+		auditAll(req.Identifier, p.PlatformID, 0, "bad_param")
 		Fail(w, CodeBadParam, "不支持的发码方式")
 		return
 	}
@@ -319,6 +328,7 @@ func (s *Server) SendCode(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		if errors.Is(err, common.ErrNotFound) {
+			auditAll(req.Identifier, p.PlatformID, 0, "bad_cred")
 			Fail(w, CodeBadCred, "账号不存在或已停用")
 			return
 		}
@@ -326,6 +336,7 @@ func (s *Server) SendCode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if u.Status != 1 {
+		auditAll(u.Username, p.PlatformID, 0, "disabled")
 		Fail(w, CodeDisabled, "账号已禁用")
 		return
 	}
@@ -336,6 +347,7 @@ func (s *Server) SendCode(w http.ResponseWriter, r *http.Request) {
 	}
 	// dev 模式：验证码直接返回，便于联调（上线接入真实发送器后删除此字段）
 	_ = p
+	auditAll(u.Username, p.PlatformID, 1, "code_sent")
 	OK(w, map[string]any{
 		"dev_code":           code,
 		"expires_in_seconds": 300,
