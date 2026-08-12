@@ -16,9 +16,7 @@ const (
 	LoginMethodUsernamePassword = "username_password" // 用户名 + 密码
 	LoginMethodEmailPassword    = "email_password"    // 邮箱 + 密码
 	LoginMethodPhoneCode        = "phone_code"        // 手机号 + 验证码
-	LoginMethodTOTP             = "totp"              // TOTP 双因子验证码（可作第二因子）
-	LoginMethodUsernameTOTP     = "username_totp"     // 用户名 + TOTP 验证码（无密码登录，完整登录方式）
-	LoginMethodEmailCode        = "email_code"        // 邮箱验证码（发码预留，可作第二因子）
+	LoginMethodUsernameTOTP     = "username_totp"     // 用户名 + TOTP 验证码（无密码，可作第二因子）
 )
 
 // 平台验证模式（platforms.auth_mode）
@@ -219,8 +217,9 @@ func (s *SettingsStore) All(ctx context.Context) (map[string]any, error) {
 }
 
 // AllLoginMethods 全部允许的登录方式（顺序即建议展示顺序）。
+// AllLoginMethods 返回全部可用登录方式（四种完整方式）。
 func AllLoginMethods() []string {
-	return []string{LoginMethodUsernamePassword, LoginMethodEmailPassword, LoginMethodPhoneCode, LoginMethodUsernameTOTP, LoginMethodTOTP}
+	return []string{LoginMethodUsernamePassword, LoginMethodEmailPassword, LoginMethodPhoneCode, LoginMethodUsernameTOTP}
 }
 
 // ValidateAuthMode 校验验证模式，空值返回默认 two_step。
@@ -234,13 +233,10 @@ func ValidateAuthMode(mode string) (string, error) {
 	return mode, nil
 }
 
-// ValidateLoginMethods 校验登录方式列表合法性（按验证模式区分语义）：
-//   - two_step（二次验证）：多选按顺序全部通过。TOTP 不能单独作为登录方式；username_totp 是完整方式不能与其他组合。
-//   - single（单次登录）：多选 = 任意其一即可。仅允许完整方式（username_password/email_password/phone_code/username_totp），
-//     TOTP/邮箱验证码这类仅第二因子的方式不允许。
-//
+// ValidateLoginMethods 校验登录方式列表合法性：非空、全部为已知方式、无重复。
+// 四种方式均为完整登录方式：单次登录（single）多选 = 任意其一；二次验证（two_step）多选 = 按顺序全部通过。
 // 返回规范化后的列表（保持传入顺序）。
-func ValidateLoginMethods(methods []string, mode string) ([]string, error) {
+func ValidateLoginMethods(methods []string, _ string) ([]string, error) {
 	allowed := AllLoginMethods()
 	if len(methods) == 0 {
 		return nil, errors.New("至少选择一种登录方式")
@@ -261,26 +257,6 @@ func ValidateLoginMethods(methods []string, mode string) ([]string, error) {
 			return nil, errors.New("登录方式不能重复")
 		}
 		seen[method] = true
-	}
-	if mode == AuthModeSingle {
-		// 单次登录：只允许完整登录方式；TOTP/邮箱验证码仅作第二因子，不可用于单次登录
-		for _, m := range methods {
-			if m == LoginMethodTOTP || m == LoginMethodEmailCode {
-				return nil, errors.New("TOTP/邮箱验证码仅用于「二次验证」模式的第二因子，单次登录请使用 username_totp")
-			}
-		}
-		return methods, nil
-	}
-	// 二次验证：TOTP 不能单独；username_totp 是完整方式不能与其他组合
-	if len(methods) == 1 && methods[0] == LoginMethodTOTP {
-		return nil, errors.New("TOTP 双因子不能单独作为登录方式，请至少再选择一种")
-	}
-	if len(methods) > 1 {
-		for _, m := range methods {
-			if m == LoginMethodUsernameTOTP {
-				return nil, errors.New("username_totp 已包含完整验证（用户名+TOTP），不能与其他登录方式组合")
-			}
-		}
 	}
 	return methods, nil
 }

@@ -25,7 +25,6 @@ const LOGIN_METHOD_OPTIONS = [
   { value: 'email_password', label: '邮箱 + 密码' },
   { value: 'phone_code', label: '手机号 + 验证码' },
   { value: 'username_totp', label: '用户名 + TOTP 验证码（无密码）' },
-  { value: 'totp', label: 'TOTP 双因子验证（第二因子）' },
 ];
 function loginMethodLabel(m) {
   const found = LOGIN_METHOD_OPTIONS.find(o => o.value === m);
@@ -487,14 +486,17 @@ const PlatformsPage = {
           <el-input v-model="dlg.form.ip_whitelist" placeholder='JSON 数组，如 ["1.2.3.4"]，留空不限制' />
         </el-form-item>
         <el-form-item label="登录方式">
-          <el-radio-group v-model="dlg.form.auth_mode" style="margin-bottom:8px">
-            <el-radio value="single">单次登录（多选 = 任意其一）</el-radio>
-            <el-radio value="two_step">二次验证（多选 = 按顺序全部通过）</el-radio>
-          </el-radio-group>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+            <span style="color:#5a6b82;font-size:13px;white-space:nowrap">验证模式</span>
+            <el-select v-model="dlg.form.auth_mode" style="width:170px">
+              <el-option value="single" label="单次登录（任一即可）" />
+              <el-option value="two_step" label="二次验证（按顺序）" />
+            </el-select>
+          </div>
           <el-checkbox-group v-model="dlg.form.login_methods" style="display:flex;flex-direction:column;gap:8px">
             <el-checkbox v-for="m in methodOptions" :key="m.value" :label="m.value">{{ m.label }}</el-checkbox>
           </el-checkbox-group>
-          <div class="settings-tip">留空 = 使用系统设置中的「新平台默认登录方式」；单次登录多选 = 任一方式通过即可；二次验证多选 = 按勾选顺序逐步验证。</div>
+          <div class="settings-tip">留空 = 使用系统设置中的「新平台默认登录方式」；单次登录多选 = 任一方式通过即可；二次验证多选 = 按勾选顺序逐步验证（如 密码 → 用户名+TOTP）。</div>
         </el-form-item>
       </el-form>
       <template #footer>

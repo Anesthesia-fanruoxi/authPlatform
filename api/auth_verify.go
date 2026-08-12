@@ -291,7 +291,7 @@ func (s *Server) SendCode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	switch req.Method {
-	case common.LoginMethodPhoneCode, common.LoginMethodEmailCode:
+	case common.LoginMethodPhoneCode:
 	default:
 		Fail(w, CodeBadParam, "不支持的发码方式")
 		return
@@ -370,7 +370,7 @@ func (s *Server) verifyCredential(ctx context.Context, u *model.User, method, id
 			return false, "bad_code", "验证码错误或已过期"
 		}
 		return true, "", ""
-	case common.LoginMethodTOTP, common.LoginMethodUsernameTOTP:
+	case common.LoginMethodUsernameTOTP:
 		if !u.TOTPEnabled || u.TOTPSecret == "" {
 			return false, "totp_disabled", "该用户未启用 TOTP 双因子验证"
 		}
@@ -395,8 +395,6 @@ func identifierForMethod(u *model.User, method string) string {
 		return strPtrVal(u.Email)
 	case common.LoginMethodPhoneCode:
 		return strPtrVal(u.Phone)
-	case common.LoginMethodTOTP:
-		return ""
 	}
 	return u.Username
 }

@@ -116,7 +116,7 @@ Headers: X-Platform-Id / X-Timestamp / X-Sign
 Body（新格式）: {"platform_id":"ops-platforms","method":"username_password","identifier":"alice","credential":"密码"}
 Body（旧格式兼容）: {"username":"alice","password":"密码","platform_id":"ops-platforms"}
 ```
-登录方式 `method`：`username_password`（默认）、`username_totp`（用户名+TOTP 验证码，无密码）、`email_password`、`phone_code`。
+登录方式 `method`：`username_password`（默认）、`email_password`、`phone_code`、`username_totp`（用户名+TOTP 验证码，无密码）。
 
 **验证模式**（平台配置 `auth_mode`）：
 - `two_step`（二次验证，默认）：多选登录方式 = **按顺序全部通过**，第一步过 → `ticket` → 第二步过 → token。
@@ -124,12 +124,12 @@ Body（旧格式兼容）: {"username":"alice","password":"密码","platform_id"
 
 **响应**：
 - 单步 / single 模式：`{"code":0,"data":{"token":"...","expires_at":"...","user":{"uid","username","nickname","status"}}}`
-- two_step 需二步：`{"code":0,"data":{"login_ticket":"...","next":"totp"}}` → 调 4.2
+- two_step 需二步：`{"code":0,"data":{"login_ticket":"...","next":"username_totp"}}` → 调 4.2
 
 ### 4.2 TOTP 第二步 `POST /api/auth/verify-step`
 
 ```
-Body: {"ticket":"<上一步的 login_ticket>","method":"totp","credential":"6位动态码"}
+Body: {"ticket":"<上一步的 login_ticket>","method":"username_totp","credential":"6位动态码"}
 响应: 同单步登录（token + user）
 ```
 

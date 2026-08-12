@@ -15,7 +15,7 @@ type Platform struct {
 	Secret string `gorm:"-" json:"-"`
 	// IPWhitelist JSON 数组文本，如 ["1.2.3.4"]，可空
 	IPWhitelist string `gorm:"type:text" json:"ip_whitelist"`
-	// LoginMethods 本平台登录方式（JSON 数组文本，如 ["username_password","totp"]）。
+	// LoginMethods 本平台登录方式（JSON 数组文本，如 ["username_password","username_totp"]）。
 	// 空 = 使用系统设置中的「新平台默认登录方式」。
 	LoginMethods string `gorm:"type:text" json:"-"`
 	// AuthMode 验证模式：single=单次登录（多选=任一即可）；two_step=二次验证（多选=按顺序全部通过）。默认 two_step。
