@@ -493,7 +493,10 @@ const PlatformsPage = {
           <el-input v-model="dlg.form.ip_whitelist" placeholder='JSON 数组，如 ["1.2.3.4"]，留空不限制' />
         </el-form-item>
         <el-form-item label="验证模式">
-          <el-segmented v-model="dlg.form.auth_mode" :options="authModeOptions" style="width:100%" />
+          <el-radio-group v-model="dlg.form.auth_mode">
+            <el-radio value="single">单次登录（任一即可）</el-radio>
+            <el-radio value="two_step">二次验证（按顺序）</el-radio>
+          </el-radio-group>
         </el-form-item>
         <el-form-item label="登录方式">
           <el-checkbox-group v-model="dlg.form.login_methods" style="display:flex;flex-wrap:wrap;gap:8px">
@@ -526,10 +529,6 @@ const PlatformsPage = {
     const dlg = reactive({ visible: false, isEdit: false, saving: false, form: { id: 0, platform_id: '', name: '', ip_whitelist: '', login_methods: [], auth_mode: 'two_step' } });
     const secretDlg = reactive({ visible: false, secret: '' });
     const methodOptions = LOGIN_METHOD_OPTIONS;
-    const authModeOptions = [
-      { label: '单次登录（任一即可）', value: 'single' },
-      { label: '二次验证（按顺序）', value: 'two_step' },
-    ];
 
     async function load() {
       loading.value = true;
@@ -610,7 +609,7 @@ const PlatformsPage = {
       } catch { ElMessage.warning('复制失败，请手动选择复制'); }
     }
 
-    return { platforms, loading, tableHeight, boxRef, dlg, secretDlg, methodOptions, authModeOptions, loginMethodLabel, load, openCreate, openEdit, save, toggleStatus, rotate, del, copySecret };
+    return { platforms, loading, tableHeight, boxRef, dlg, secretDlg, methodOptions, loginMethodLabel, load, openCreate, openEdit, save, toggleStatus, rotate, del, copySecret };
   },
 };
 
