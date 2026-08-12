@@ -36,12 +36,22 @@ func (s *Server) Verify(w http.ResponseWriter, r *http.Request) {
 		Fail(w, CodeBadParam, "参数错误")
 		return
 	}
+	// 请求头/请求体（脱敏）随审计记录，任何结果（成功/失败/参数错误）都留痕
+	reqHeaders := common.SanitizeRequestHeaders(r.Header)
+	reqBody := common.SanitizeRequestBody(body)
+	auditAll := func(username, platformID string, success int, reason string) {
+		_ = s.Audit.WriteLoginDetail(r.Context(), username, platformID, success, reason, clientIP(r), reqHeaders, reqBody)
+	}
+
 	p, ok := s.verifyPlatformRequest(w, r, body)
 	if !ok {
+		// 平台签名无效/平台不存在：平台身份未知，仍记录请求留痕
+		auditAll("", "", 0, "sign_invalid")
 		return
 	}
 	var req verifyRequest
 	if err := json.Unmarshal(body, &req); err != nil {
+		auditAll("", p.PlatformID, 0, "bad_param")
 		Fail(w, CodeBadParam, "参数错误")
 		return
 	}
@@ -54,6 +64,7 @@ func (s *Server) Verify(w http.ResponseWriter, r *http.Request) {
 		method = common.LoginMethodUsernamePassword // 缺省 method 默认用户名+密码
 	}
 	if identifier == "" || credential == "" {
+		auditAll("", p.PlatformID, 0, "bad_param")
 		Fail(w, CodeBadParam, "参数错误")
 		return
 	}
@@ -71,16 +82,17 @@ func (s *Server) Verify(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if !in {
+			auditAll(identifier, p.PlatformID, 0, "bad_param")
 			Fail(w, CodeBadParam, "当前平台支持登录方式: "+strings.Join(methods, " / "))
 			return
 		}
 	} else if method != first {
+		auditAll(identifier, p.PlatformID, 0, "bad_param")
 		Fail(w, CodeBadParam, "当前第一步登录方式为 "+first)
 		return
 	}
-	ip := clientIP(r)
 	audit := func(success int, reason string) {
-		_ = s.Audit.WriteLogin(r.Context(), identifier, p.PlatformID, success, reason, ip)
+		auditAll(identifier, p.PlatformID, success, reason)
 	}
 
 	// 定位用户（按第一步方式）
@@ -177,8 +189,15 @@ func (s *Server) VerifyStep(w http.ResponseWriter, r *http.Request) {
 		Fail(w, CodeBadParam, "参数错误")
 		return
 	}
+	// 请求头/请求体（脱敏）随审计记录，任何结果都留痕
+	reqHeaders := common.SanitizeRequestHeaders(r.Header)
+	reqBody := common.SanitizeRequestBody(body)
+	auditAll := func(username, platformID string, success int, reason string) {
+		_ = s.Audit.WriteLoginDetail(r.Context(), username, platformID, success, reason, clientIP(r), reqHeaders, reqBody)
+	}
 	p, ok := s.verifyPlatformRequest(w, r, body)
 	if !ok {
+		auditAll("", "", 0, "sign_invalid")
 		return
 	}
 	var req struct {
@@ -187,15 +206,18 @@ func (s *Server) VerifyStep(w http.ResponseWriter, r *http.Request) {
 		Credential string `json:"credential"`
 	}
 	if err := json.Unmarshal(body, &req); err != nil || req.Ticket == "" || req.Credential == "" {
+		auditAll("", p.PlatformID, 0, "bad_param")
 		Fail(w, CodeBadParam, "参数错误")
 		return
 	}
 	t, ok := s.Tickets.Get(req.Ticket)
 	if !ok {
+		auditAll("", p.PlatformID, 0, "bad_param")
 		Fail(w, CodeBadParam, "登录票据无效或已过期")
 		return
 	}
 	if t.PlatformID != p.ID {
+		auditAll("", p.PlatformID, 0, "bad_param")
 		Fail(w, CodeBadParam, "登录票据与平台不匹配")
 		return
 	}
@@ -212,20 +234,19 @@ func (s *Server) VerifyStep(w http.ResponseWriter, r *http.Request) {
 		s.internalError(w, err)
 		return
 	}
-	ip := clientIP(r)
 	if u.Status != 1 {
-		_ = s.Audit.WriteLogin(r.Context(), u.Username, p.PlatformID, 0, "disabled", ip)
+		auditAll(u.Username, p.PlatformID, 0, "disabled")
 		s.Tickets.Delete(req.Ticket)
 		Fail(w, CodeDisabled, "账号已禁用")
 		return
 	}
 	if err := s.Limiter.Check(u.Username); err != nil {
 		if errors.Is(err, common.ErrBanned) {
-			_ = s.Audit.WriteLogin(r.Context(), u.Username, p.PlatformID, 0, "banned", ip)
+			auditAll(u.Username, p.PlatformID, 0, "banned")
 			Fail(w, CodeLocked, err.Error())
 			return
 		}
-		_ = s.Audit.WriteLogin(r.Context(), u.Username, p.PlatformID, 0, "locked", ip)
+		auditAll(u.Username, p.PlatformID, 0, "locked")
 		Fail(w, CodeLocked, err.Error())
 		return
 	}
@@ -234,7 +255,7 @@ func (s *Server) VerifyStep(w http.ResponseWriter, r *http.Request) {
 	if !okCred {
 		// 凭证失败：保留 ticket 允许重试（限流兜底），不销毁登录流程
 		s.Limiter.RecordFail(u.Username)
-		_ = s.Audit.WriteLogin(r.Context(), u.Username, p.PlatformID, 0, reason, ip)
+		auditAll(u.Username, p.PlatformID, 0, reason)
 		Fail(w, CodeBadCred, failMsg)
 		return
 	}
@@ -242,7 +263,7 @@ func (s *Server) VerifyStep(w http.ResponseWriter, r *http.Request) {
 
 	if len(t.Methods) > doneCount+1 {
 		// 还有后续步骤
-		_ = s.Audit.WriteLogin(r.Context(), u.Username, p.PlatformID, 1, "step_ok", ip)
+		auditAll(u.Username, p.PlatformID, 1, "step_ok")
 		OK(w, map[string]any{
 			"ticket":      req.Ticket,
 			"step":        doneCount + 2,
@@ -257,7 +278,7 @@ func (s *Server) VerifyStep(w http.ResponseWriter, r *http.Request) {
 	// 全部步骤完成，签发最终 token
 	s.Tickets.Delete(req.Ticket)
 	s.Limiter.Reset(u.Username)
-	_ = s.Audit.WriteLogin(r.Context(), u.Username, p.PlatformID, 1, "ok", ip)
+	auditAll(u.Username, p.PlatformID, 1, "ok")
 	s.issueToken(w, r, u, p)
 }
 

@@ -826,6 +826,12 @@ const LogsPage = {
           <template #default="{row}"><span style="color:#5a6b82">{{ reasonText(row.reason) }}</span></template>
         </el-table-column>
         <el-table-column prop="ip" label="IP" min-width="140" />
+        <el-table-column label="请求详情" width="90" align="center">
+          <template #default="{row}">
+            <el-button v-if="row.request_headers || row.request_body" link type="primary" @click="showDetail(row)">查看</el-button>
+            <span v-else style="color:#c0c9d6;font-size:12px">—</span>
+          </template>
+        </el-table-column>
         <template #empty>
           <div class="table-empty">
             <span class="table-empty-ic">${svg('list')}</span>
@@ -834,10 +840,27 @@ const LogsPage = {
         </template>
       </el-table>
       </div>
+
+      <!-- 请求详情 -->
+      <el-dialog v-model="detailDlg.visible" title="登录请求详情" width="680" align-center>
+        <el-alert type="info" :closable="false" show-icon style="margin-bottom:10px"
+          title="敏感字段（密码/验证码/密钥/token）已脱敏，仅保留前 4 位用于排查" />
+        <p style="font-weight:600;margin-bottom:6px">请求头</p>
+        <pre class="req-detail">{{ detailDlg.headers || '(无)' }}</pre>
+        <p style="font-weight:600;margin:12px 0 6px">请求体</p>
+        <pre class="req-detail">{{ detailDlg.body || '(无)' }}</pre>
+        <template #footer><el-button type="primary" @click="detailDlg.visible = false">关闭</el-button></template>
+      </el-dialog>
     </el-card>
   `,
   setup() {
     const logs = ref([]);
+    const detailDlg = reactive({ visible: false, headers: '', body: '' });
+    function showDetail(row) {
+      detailDlg.headers = row.request_headers || '';
+      detailDlg.body = row.request_body || '';
+      detailDlg.visible = true;
+    }
     const loading = ref(false);
     const { tableHeight, boxRef } = useTableFill();
     const filters = reactive({ username: '', platform_id: '', success: undefined });
@@ -865,7 +888,7 @@ const LogsPage = {
       return map[reason] || reason;
     }
 
-    return { logs, loading, tableHeight, boxRef, filters, load, reasonText };
+    return { logs, loading, tableHeight, boxRef, filters, load, reasonText, detailDlg, showDetail };
   },
 };
 
