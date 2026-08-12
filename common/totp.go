@@ -13,10 +13,10 @@ import (
 )
 
 const (
-	totpPeriod   = 30          // 时间步长（秒）
-	totpDigits   = 6           // 密码位数
-	totpKeyLen   = 20          // 密钥字节长度（160bit，与 Google Authenticator 一致）
-	totpWindow   = 1           // 校验允许的时间步偏差（±1 步容忍时钟漂移）
+	totpPeriod   = 30 // 时间步长（秒）
+	totpDigits   = 6  // 密码位数
+	totpKeyLen   = 20 // 密钥字节长度（160bit，与 Google Authenticator 一致）
+	totpWindow   = 1  // 校验允许的时间步偏差（±1 步容忍时钟漂移）
 	totpIssuer   = "authPlatform"
 	totpAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
 )

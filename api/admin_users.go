@@ -103,15 +103,15 @@ func (s *Server) CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	u := &model.User{
-		UID:          uid,
-		Username:     req.Username,
-		PasswordHash: hash,
-		Nickname:     req.Nickname,
+		UID:            uid,
+		Username:       req.Username,
+		PasswordHash:   hash,
+		Nickname:       req.Nickname,
 		NicknamePinyin: common.Pinyin(req.Nickname),
-		Phone:        emptyToNil(req.Phone),
-		Email:        emptyToNil(req.Email),
-		Category:     req.Category,
-		Status:       1,
+		Phone:          emptyToNil(req.Phone),
+		Email:          emptyToNil(req.Email),
+		Category:       req.Category,
+		Status:         1,
 	}
 	if err := s.Users.Create(r.Context(), u); err != nil {
 		if errors.Is(err, gorm.ErrDuplicatedKey) {

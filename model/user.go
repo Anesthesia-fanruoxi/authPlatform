@@ -4,22 +4,22 @@ package model
 import "time"
 
 type User struct {
-	ID           int64     `gorm:"primaryKey;autoIncrement" json:"id"`
-	UID          string    `gorm:"size:32;uniqueIndex;not null" json:"uid"`
-	Username     string    `gorm:"size:64;uniqueIndex;not null" json:"username"`
-	PasswordHash string    `gorm:"size:255;not null" json:"-"`
-	Nickname         string    `gorm:"size:64;default:''" json:"nickname"`
-	NicknamePinyin   string    `gorm:"size:128;default:''" json:"nickname_pinyin"`
+	ID             int64  `gorm:"primaryKey;autoIncrement" json:"id"`
+	UID            string `gorm:"size:32;uniqueIndex;not null" json:"uid"`
+	Username       string `gorm:"size:64;uniqueIndex;not null" json:"username"`
+	PasswordHash   string `gorm:"size:255;not null" json:"-"`
+	Nickname       string `gorm:"size:64;default:''" json:"nickname"`
+	NicknamePinyin string `gorm:"size:128;default:''" json:"nickname_pinyin"`
 	// Phone/Email 可空（NULL 不参与唯一约束，允许空值重复）
-	Phone        *string   `gorm:"size:20;uniqueIndex" json:"phone"`
-	Email        *string   `gorm:"size:128;uniqueIndex" json:"email"`
+	Phone *string `gorm:"size:20;uniqueIndex" json:"phone"`
+	Email *string `gorm:"size:128;uniqueIndex" json:"email"`
 	// TOTPSecret 双因子 TOTP 密钥（base32，空表示未启用 TOTP）
-	TOTPSecret  string    `gorm:"size:64;default:''" json:"-"`
-	TOTPEnabled bool      `gorm:"default:false" json:"totp_enabled"`
+	TOTPSecret  string `gorm:"size:64;default:''" json:"-"`
+	TOTPEnabled bool   `gorm:"default:false" json:"totp_enabled"`
 	// Category 用户分类（开发/测试/运营/风控/数分等，管理员在系统设置维护），用于快捷授权平台。
-	Category    string    `gorm:"size:64;default:''" json:"category"`
-	Status      int       `gorm:"default:1" json:"status"` // 1 启用 0 禁用
-	IsAdmin     bool      `gorm:"default:false" json:"is_admin"`
+	Category string `gorm:"size:64;default:''" json:"category"`
+	Status   int    `gorm:"default:1" json:"status"` // 1 启用 0 禁用
+	IsAdmin  bool   `gorm:"default:false" json:"is_admin"`
 	// SessionHash 管理后台单点登录：当前有效 admin 会话 token 的 sha256。新登录覆盖旧 token（同一账号只生效一个会话）。
 	SessionHash string    `gorm:"size:64;default:''" json:"-"`
 	CreatedAt   time.Time `gorm:"autoCreateTime" json:"created_at"`
@@ -39,17 +39,17 @@ func (u *User) SafeUser() map[string]any {
 		email = *u.Email
 	}
 	return map[string]any{
-		"id":           u.ID,
-		"uid":          u.UID,
-		"username":     u.Username,
+		"id":              u.ID,
+		"uid":             u.UID,
+		"username":        u.Username,
 		"nickname":        u.Nickname,
 		"nickname_pinyin": u.NicknamePinyin,
-		"phone":        phone,
-		"email":        email,
-		"totp_enabled": u.TOTPEnabled,
-		"category":     u.Category,
-		"status":       u.Status,
-		"is_admin":     u.IsAdmin,
-		"created_at":   u.CreatedAt.Format(time.RFC3339),
+		"phone":           phone,
+		"email":           email,
+		"totp_enabled":    u.TOTPEnabled,
+		"category":        u.Category,
+		"status":          u.Status,
+		"is_admin":        u.IsAdmin,
+		"created_at":      u.CreatedAt.Format(time.RFC3339),
 	}
 }

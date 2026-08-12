@@ -11,9 +11,9 @@ import (
 // 验证码：内存存储（dev 模式）。发送器暂不实现（后续接入短信/邮件服务商时替换发码环节）。
 // 生成后由调用方决定是否回传（当前 dev 模式在响应中返回 code 并打印日志，便于联调）。
 const (
-	verCodeTTL      = 5 * time.Minute
-	verCodeMaxTry   = 5 // 校验尝试次数上限，超限作废
-	verCodeDigits   = 6
+	verCodeTTL    = 5 * time.Minute
+	verCodeMaxTry = 5 // 校验尝试次数上限，超限作废
+	verCodeDigits = 6
 )
 
 type verCodeInfo struct {

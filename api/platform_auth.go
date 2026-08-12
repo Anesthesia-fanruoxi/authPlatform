@@ -95,13 +95,13 @@ func userWhitelist(u *model.User) map[string]any {
 		email = *u.Email
 	}
 	return map[string]any{
-		"uid":        u.UID,
-		"username":   u.Username,
-		"nickname":   u.Nickname,
+		"uid":             u.UID,
+		"username":        u.Username,
+		"nickname":        u.Nickname,
 		"nickname_pinyin": u.NicknamePinyin,
-		"phone":      phone,
-		"email":      email,
-		"status":     u.Status,
-		"created_at": u.CreatedAt.Format(time.RFC3339),
+		"phone":           phone,
+		"email":           email,
+		"status":          u.Status,
+		"created_at":      u.CreatedAt.Format(time.RFC3339),
 	}
 }

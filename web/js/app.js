@@ -6,6 +6,7 @@ const { ElMessage, ElMessageBox } = ElementPlus;
 // ---------- 内联 SVG 图标（stroke 风格，随 currentColor 渲染） ----------
 const Ic = {
   shield: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>',
+  clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
   users: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
   grid: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/></svg>',
   key: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>',
@@ -100,12 +101,6 @@ const api = {
     Object.entries(params || {}).forEach(([k, v]) => { if (v !== '' && v !== undefined && v !== null) q.set(k, v); });
     const s = q.toString();
     return this.request('/api/admin/logs' + (s ? '?' + s : ''));
-  },
-  listRequestLogs(params) {
-    const q = new URLSearchParams();
-    Object.entries(params || {}).forEach(([k, v]) => { if (v !== '' && v !== undefined && v !== null) q.set(k, v); });
-    const s = q.toString();
-    return this.request('/api/admin/request-logs' + (s ? '?' + s : ''));
   },
   // 系统设置
   listSettings() { return this.request('/api/admin/settings'); },
@@ -813,111 +808,6 @@ function copyText(text) {
   return Promise.resolve(fallback());
 }
 
-// ---------- 请求日志页 ----------
-const RequestLogsPage = {
-  name: 'RequestLogsPage',
-  template: `
-    <el-card class="page-card">
-      <template #header>
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
-          <div class="card-title">${svg('list')}请求日志<span style="color:#8a97ab;font-size:12px;margin-left:8px">全量 API 请求留痕（含 GET 无参数）</span></div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <el-input v-model="filters.method" placeholder="方法" style="width:90px" clearable @keyup.enter="load" />
-            <el-input v-model="filters.path" placeholder="路径" style="width:160px" clearable @keyup.enter="load" />
-            <el-input v-model="filters.platform_id" placeholder="平台标识" style="width:130px" clearable @keyup.enter="load" />
-            <el-select v-model="filters.status" placeholder="状态码" style="width:100px" clearable>
-              <el-option label="200" :value="200" />
-              <el-option label="4xx" :value="400" />
-              <el-option label="500" :value="500" />
-            </el-select>
-            <el-button type="primary" @click="load">查询</el-button>
-          </div>
-        </div>
-      </template>
-      <div class="table-box" ref="boxRef">
-      <el-table :data="logs" v-loading="loading" stripe :height="tableHeight">
-        <el-table-column prop="created_at" label="时间" min-width="190" />
-        <el-table-column prop="method" label="方法" width="70" align="center">
-          <template #default="{row}"><el-tag :type="row.method === 'GET' ? 'info' : row.method === 'POST' ? 'primary' : 'warning'" size="small" effect="plain">{{ row.method }}</el-tag></template>
-        </el-table-column>
-        <el-table-column label="路径" min-width="200">
-          <template #default="{row}">
-            <span style="font-family:Consolas,Menlo,monospace;font-size:12px">{{ row.path }}</span>
-            <span v-if="row.query" style="color:#8a97ab;font-size:12px">?{{ row.query }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="platform_id" label="平台标识" min-width="110">
-          <template #default="{row}"><span style="font-family:Consolas,Menlo,monospace;font-size:12px">{{ row.platform_id || '—' }}</span></template>
-        </el-table-column>
-        <el-table-column prop="ip" label="IP" min-width="130" />
-        <el-table-column label="状态" width="80" align="center">
-          <template #default="{row}">
-            <el-tag :type="row.status >= 500 ? 'danger' : row.status >= 400 ? 'warning' : 'success'" effect="light" round size="small">{{ row.status }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="请求详情" width="90" align="center">
-          <template #default="{row}"><el-button link type="primary" @click="showDetail(row)">查看</el-button></template>
-        </el-table-column>
-        <template #empty>
-          <div class="table-empty">
-            <span class="table-empty-ic">${svg('list')}</span>
-            <p>暂无请求日志</p>
-          </div>
-        </template>
-      </el-table>
-      </div>
-
-      <!-- 请求详情 -->
-      <el-dialog v-model="detailDlg.visible" title="请求详情" width="700" align-center>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-          <span style="font-weight:600">{{ detailDlg.method }} {{ detailDlg.path }}{{ detailDlg.query ? '?' + detailDlg.query : '' }}</span>
-          <el-button type="primary" plain size="small" @click="copyDetail">一键复制</el-button>
-        </div>
-        <el-alert type="info" :closable="false" show-icon style="margin-bottom:10px"
-          title="敏感字段（密码/验证码/密钥/token）已脱敏，仅保留前 4 位用于排查" />
-        <p style="font-weight:600;margin-bottom:6px">请求头</p>
-        <pre class="req-detail">{{ detailDlg.headers || '(无)' }}</pre>
-        <p style="font-weight:600;margin:12px 0 6px">请求体</p>
-        <pre class="req-detail">{{ detailDlg.body || '(无)' }}</pre>
-        <template #footer><el-button type="primary" @click="detailDlg.visible = false">关闭</el-button></template>
-      </el-dialog>
-    </el-card>
-  `,
-  setup() {
-    const logs = ref([]);
-    const filters = reactive({ method: '', path: '', platform_id: '', status: null });
-    const loading = ref(false);
-    const { tableHeight, boxRef } = useTableFill();
-    const detailDlg = reactive({ visible: false, method: '', path: '', query: '', headers: '', body: '' });
-    async function load() {
-      loading.value = true;
-      try {
-        const data = await api.listRequestLogs({
-          method: filters.method, path: filters.path, platform_id: filters.platform_id,
-          status: filters.status === 400 || filters.status === 500 ? filters.status : '',
-        });
-        logs.value = data.logs || [];
-      } catch (e) { ElMessage.error(e.message); }
-      finally { loading.value = false; }
-    }
-    function showDetail(row) {
-      detailDlg.method = row.method;
-      detailDlg.path = row.path;
-      detailDlg.query = row.query || '';
-      detailDlg.headers = row.headers || '';
-      detailDlg.body = row.body || '';
-      detailDlg.visible = true;
-    }
-    async function copyDetail() {
-      const text = `${detailDlg.method} ${detailDlg.path}${detailDlg.query ? '?' + detailDlg.query : ''}\n\n【请求头】\n${detailDlg.headers || '(无)'}\n\n【请求体】\n${detailDlg.body || '(无)'}`;
-      const ok = await copyText(text);
-      ElMessage.success(ok ? '已复制' : '复制失败');
-    }
-    onMounted(load);
-    return { logs, filters, loading, tableHeight, boxRef, detailDlg, load, showDetail, copyDetail };
-  },
-};
-
 // ---------- 审计日志页 ----------
 const LogsPage = {
   name: 'LogsPage',
@@ -1211,6 +1101,18 @@ const SettingsPage = {
       </el-card>
 
       <el-card class="settings-card">
+        <template #header><div class="card-title">${svg('clock')}登录日志保留设置</div></template>
+        <el-form label-width="130px" label-position="left">
+          <el-form-item label="保留天数">
+            <el-input-number v-model="form.log_retention.days" :min="1" :max="3650" />
+            <span style="color:#8a97ab;font-size:12px;margin-left:10px">天（默认 30 天）</span>
+          </el-form-item>
+        </el-form>
+        <p class="settings-tip">服务每 24 小时自动清理一次登录审计日志，删除早于保留天数的记录（全量请求日志不受影响）。</p>
+        <div class="settings-actions"><el-button type="primary" :loading="savingKey==='log_retention'" @click="save('log_retention')">保存</el-button></div>
+      </el-card>
+
+      <el-card class="settings-card">
         <template #header><div class="card-title">${svg('grid')}后台登录 IP 白名单</div></template>
         <el-input v-model="ipText" type="textarea" :rows="5" placeholder="每行一个 IP，如：&#10;127.0.0.1&#10;10.0.0.5" />
         <p class="settings-tip">仅管理后台登录生效（管理端部署于内网）。留空 = 不限制。</p>
@@ -1236,6 +1138,7 @@ const SettingsPage = {
     const form = reactive({
       password_policy: { min_length: 8, require_letter: true, require_digit: true, require_special: false },
       login_limit: { max_fails: 5, window_minutes: 15, lock_minutes: 15 },
+      log_retention: { days: 30 },
     });
     const loginMethods = ref([]);
     const ipText = ref('');
@@ -1248,6 +1151,7 @@ const SettingsPage = {
         const d = await api.listSettings();
         if (d.password_policy) Object.assign(form.password_policy, d.password_policy);
         if (d.login_limit) Object.assign(form.login_limit, d.login_limit);
+        if (d.log_retention) Object.assign(form.log_retention, d.log_retention);
         loginMethods.value = (d.login_methods && d.login_methods.methods) || ['username_password'];
         ipText.value = ((d.admin_ip_whitelist && d.admin_ip_whitelist.ips) || []).join('\n');
         categories.value = (d.user_categories && d.user_categories.items) || [];
@@ -1339,7 +1243,6 @@ const Root = {
           <el-menu-item index="/platforms">${svg('grid', 'm-icon')}<span>平台管理</span></el-menu-item>
           <el-menu-item index="/grants">${svg('key', 'm-icon')}<span>授权管理</span></el-menu-item>
           <el-menu-item index="/logs">${svg('list', 'm-icon')}<span>审计日志</span></el-menu-item>
-          <el-menu-item index="/request-logs">${svg('eye', 'm-icon')}<span>请求日志</span></el-menu-item>
           <el-menu-item index="/bans">${svg('lock', 'm-icon')}<span>黑名单管理</span></el-menu-item>
           <el-menu-item index="/settings">${svg('grid', 'm-icon')}<span>系统设置</span></el-menu-item>
         </el-menu>
@@ -1401,19 +1304,17 @@ const Root = {
         case '/platforms': return PlatformsPage;
         case '/grants': return GrantsPage;
         case '/logs': return LogsPage;
-        case '/request-logs': return RequestLogsPage;
         case '/bans': return BansPage;
         case '/settings': return SettingsPage;
         default: return UsersPage;
       }
     });
-    const pageNames = ['UsersPage', 'PlatformsPage', 'GrantsPage', 'LogsPage', 'RequestLogsPage', 'BansPage', 'SettingsPage'];
+    const pageNames = ['UsersPage', 'PlatformsPage', 'GrantsPage', 'LogsPage', 'BansPage', 'SettingsPage'];
     const pageTitle = computed(() => {
       switch (route.value) {
         case '/platforms': return '平台管理';
         case '/grants': return '授权管理';
         case '/logs': return '审计日志';
-        case '/request-logs': return '请求日志';
         case '/bans': return '黑名单管理';
         case '/settings': return '系统设置';
         default: return '用户管理';

@@ -5,6 +5,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"time"
 
 	"authplatform/api"
 	"authplatform/common"
@@ -36,6 +37,7 @@ func main() {
 		log.Fatalf("ensure settings: %v", err)
 	}
 	backfillPinyin(db)
+	startLogCleanup(settings, audit)
 	if err := common.EnsureAdmin(context.Background(), users, cfg.AdminUsername, cfg.AdminPassword); err != nil {
 		log.Fatalf("ensure admin: %v", err)
 	}
@@ -64,6 +66,34 @@ func main() {
 	if err := srv.ListenAndServe(); err != nil {
 		log.Fatalf("server: %v", err)
 	}
+}
+
+// startLogCleanup 启动登录日志自动清理：启动 1 分钟后执行一次，此后每 24 小时执行。
+// 每次执行读取系统设置的「登录日志保留天数」，删除 login_logs 中超过保留期的记录（request_logs 全量请求日志不清理）。
+func startLogCleanup(settings *common.SettingsStore, audit *common.AuditStore) {
+	go func() {
+		cleanupOnce := func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+			defer cancel()
+			days := settings.GetLogRetentionDays(ctx)
+			cutoff := time.Now().Add(-time.Duration(days) * 24 * time.Hour)
+			deleted, err := audit.Cleanup(ctx, cutoff)
+			if err != nil {
+				log.Printf("[cleanup] 清理登录日志失败: %v", err)
+				return
+			}
+			if deleted > 0 {
+				log.Printf("[cleanup] 自动清理完成：删除 %d 天前的登录日志 %d 条", days, deleted)
+			}
+		}
+		time.Sleep(1 * time.Minute) // 启动后先执行一次（清理存量）
+		cleanupOnce()
+		ticker := time.NewTicker(24 * time.Hour)
+		defer ticker.Stop()
+		for range ticker.C {
+			cleanupOnce()
+		}
+	}()
 }
 
 // backfillPinyin 存量数据回填：为昵称非空但 nickname_pinyin 为空的用户补算拼音（幂等，启动后执行一次）。

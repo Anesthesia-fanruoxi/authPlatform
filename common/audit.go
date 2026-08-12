@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"sort"
 	"strings"
+	"time"
 
 	"authplatform/model"
 	"gorm.io/gorm"
@@ -38,42 +39,11 @@ func (s *AuditStore) WriteLoginDetail(ctx context.Context, username, platformID 
 	return s.db.WithContext(ctx).Create(log).Error
 }
 
-// WriteRequest 写入一条全量请求日志（方法/路径/query/头/体/IP/状态码）。
-func (s *AuditStore) WriteRequest(ctx context.Context, method, path, query, platformID, ip, headers, body string, status int) error {
-	log := &model.RequestLog{
-		Method:     method,
-		Path:       path,
-		Query:      query,
-		PlatformID: platformID,
-		IP:         ip,
-		Status:     status,
-		Headers:    headers,
-		Body:       body,
-	}
-	return s.db.WithContext(ctx).Create(log).Error
-}
-
-// ListRequest 查询全量请求日志（可按方法/路径/状态码筛选，倒序）。
-func (s *AuditStore) ListRequest(ctx context.Context, method, path, platformID string, status *int, limit int) ([]*model.RequestLog, error) {
-	q := s.db.WithContext(ctx).Model(&model.RequestLog{})
-	if method != "" {
-		q = q.Where("method = ?", method)
-	}
-	if path != "" {
-		q = q.Where("path LIKE ?", "%"+path+"%")
-	}
-	if platformID != "" {
-		q = q.Where("platform_id = ?", platformID)
-	}
-	if status != nil {
-		q = q.Where("status = ?", *status)
-	}
-	if limit <= 0 || limit > 500 {
-		limit = 100
-	}
-	var list []*model.RequestLog
-	err := q.Order("id DESC").Limit(limit).Find(&list).Error
-	return list, err
+// Cleanup 按时间清理过期的登录日志（login_logs）：删除 created_at 早于 before 的记录。
+// 全量请求日志（request_logs）不在此清理范围。返回删除条数与错误。
+func (s *AuditStore) Cleanup(ctx context.Context, before time.Time) (int64, error) {
+	res := s.db.WithContext(ctx).Where("created_at < ?", before).Delete(&model.LoginLog{})
+	return res.RowsAffected, res.Error
 }
 
 // sensitiveKeys 审计脱敏的敏感字段：值保留前 4 位便于定位，其余打码。

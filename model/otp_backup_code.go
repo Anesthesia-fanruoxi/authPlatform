@@ -7,8 +7,8 @@ import "time"
 type OTPBackupCode struct {
 	ID        int64      `gorm:"primaryKey" json:"id"`
 	UserID    int64      `gorm:"index;not null" json:"user_id"` // authplatform users.id
-	Code      string     `gorm:"size:16;not null" json:"code"`   // 一次性恢复码
-	Used      bool       `gorm:"default:false" json:"used"`      // 0=未用 1=已用
+	Code      string     `gorm:"size:16;not null" json:"code"`  // 一次性恢复码
+	Used      bool       `gorm:"default:false" json:"used"`     // 0=未用 1=已用
 	UsedAt    *time.Time `json:"used_at"`
 	CreatedAt time.Time  `json:"created_at"`
 }

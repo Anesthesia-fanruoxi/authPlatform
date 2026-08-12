@@ -169,6 +169,27 @@ func (s *SettingsStore) GetLoginMethods(ctx context.Context) LoginMethods {
 	return m
 }
 
+// LogRetention 登录日志保留天数设置（自动清理阈值）。
+type LogRetention struct {
+	Days int `json:"days"` // 保留天数，默认 30
+}
+
+// defaultLogRetentionDays 默认登录日志保留天数。
+const defaultLogRetentionDays = 30
+
+// GetLogRetentionDays 返回登录日志保留天数（未配置/解析失败回退默认 30，范围 1-3650）。
+func (s *SettingsStore) GetLogRetentionDays(ctx context.Context) int {
+	var r LogRetention
+	if err := s.getJSON(ctx, "log_retention", &r); err != nil {
+		log.Printf("[settings] log_retention parse error: %v", err)
+		return defaultLogRetentionDays
+	}
+	if r.Days < 1 || r.Days > 3650 {
+		return defaultLogRetentionDays
+	}
+	return r.Days
+}
+
 // GetAdminIPWhitelist 返回后台登录 IP 白名单。
 func (s *SettingsStore) GetAdminIPWhitelist(ctx context.Context) AdminIPWhitelist {
 	var w AdminIPWhitelist

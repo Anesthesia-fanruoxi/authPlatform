@@ -25,7 +25,7 @@ func (s *Server) ListSettings(w http.ResponseWriter, r *http.Request) {
 func (s *Server) UpdateSettings(w http.ResponseWriter, r *http.Request) {
 	key := r.PathValue("key")
 	switch key {
-	case "password_policy", "login_limit", "login_methods", "admin_ip_whitelist", "user_categories":
+	case "password_policy", "login_limit", "login_methods", "admin_ip_whitelist", "user_categories", "log_retention":
 	default:
 		Fail(w, CodeBadParam, "不支持的设置项")
 		return
@@ -67,6 +67,13 @@ func (s *Server) UpdateSettings(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		saveErr = s.Settings.Set(r.Context(), key, m)
+	case "log_retention":
+		var lr common.LogRetention
+		if err := json.Unmarshal(raw, &lr); err != nil || lr.Days < 1 || lr.Days > 3650 {
+			Fail(w, CodeBadParam, "日志保留天数需在 1-3650 之间")
+			return
+		}
+		saveErr = s.Settings.Set(r.Context(), key, lr)
 	case "admin_ip_whitelist":
 		var wl struct {
 			IPs []string `json:"ips"`

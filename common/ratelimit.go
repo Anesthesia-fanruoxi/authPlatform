@@ -28,7 +28,7 @@ type BanRecord struct {
 	Username  string    `json:"username"`
 	Source    string    `json:"source"` // auto / manual
 	Reason    string    `json:"reason"`
-	Operator  string    `json:"operator"` // 手动操作管理员；自动锁定为空
+	Operator  string    `json:"operator"`   // 手动操作管理员；自动锁定为空
 	ExpiresAt time.Time `json:"expires_at"` // 零值 = 永久
 	CreatedAt time.Time `json:"created_at"`
 }
@@ -52,9 +52,9 @@ type failInfo struct {
 // RateLimiter 内存版账号维度限流 + 黑名单（单实例进程内有效）。
 // 策略可在运行时通过 SetPolicy 更新（与 sys_settings.login_limit 联动）。
 type RateLimiter struct {
-	mu    sync.Mutex
-	fails map[string]*failInfo
-	bans  map[string]*BanRecord // username -> record
+	mu     sync.Mutex
+	fails  map[string]*failInfo
+	bans   map[string]*BanRecord // username -> record
 	banSeq int64
 
 	maxFails int

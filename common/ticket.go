@@ -11,8 +11,8 @@ import (
 // 第一步验证通过后签发，服务端内存存储，短有效期；后续步骤携带 ticket 继续，
 // 全部验证通过后签发最终 token 并销毁 ticket。
 const (
-	ticketTTL       = 5 * time.Minute
-	ticketTokenLen  = 32 // 字节
+	ticketTTL      = 5 * time.Minute
+	ticketTokenLen = 32 // 字节
 )
 
 type LoginTicket struct {
