@@ -101,6 +101,8 @@ func (s *Server) Login(w http.ResponseWriter, r *http.Request) {
 		s.internalError(w, err)
 		return
 	}
+	// 管理后台单点登录：新登录覆盖旧 token，同一账号只生效一个会话
+	_ = s.Users.Update(r.Context(), u.ID, map[string]any{"session_hash": common.HashToken(token)})
 	OK(w, map[string]any{"token": token, "user": u.SafeUser()})
 }
 

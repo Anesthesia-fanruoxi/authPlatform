@@ -92,6 +92,11 @@ func adminAuth(users *common.UserStore, secret string, next http.HandlerFunc) ht
 			api.Fail(w, api.CodeUnauthorized, "未登录或登录已过期")
 			return
 		}
+		// 单点登录：仅接受当前会话 token；被新登录覆盖的旧 token 立即失效
+		if u.SessionHash != "" && u.SessionHash != common.HashToken(token) {
+			api.Fail(w, api.CodeUnauthorized, "该账号已在其他地方登录，请重新登录")
+			return
+		}
 		ctx := context.WithValue(r.Context(), api.CtxKeyUserID, userID)
 		next(w, r.WithContext(ctx))
 	}

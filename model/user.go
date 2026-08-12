@@ -20,6 +20,8 @@ type User struct {
 	Category    string    `gorm:"size:64;default:''" json:"category"`
 	Status      int       `gorm:"default:1" json:"status"` // 1 启用 0 禁用
 	IsAdmin     bool      `gorm:"default:false" json:"is_admin"`
+	// SessionHash 管理后台单点登录：当前有效 admin 会话 token 的 sha256。新登录覆盖旧 token（同一账号只生效一个会话）。
+	SessionHash string    `gorm:"size:64;default:''" json:"-"`
 	CreatedAt   time.Time `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt   time.Time `gorm:"autoUpdateTime" json:"updated_at"`
 }

@@ -2,6 +2,7 @@ package common
 
 import (
 	"crypto/hmac"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
@@ -21,9 +22,20 @@ var (
 	ErrTokenExpired = errors.New("token expired")
 )
 
+// HashToken 计算 token 的 sha256 十六进制（用于管理后台单会话：新登录覆盖旧 token）。
+func HashToken(token string) string {
+	s := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(s[:])
+}
+
 func SignSessionToken(secret string, userID int64, ttl time.Duration) (string, error) {
 	exp := time.Now().Add(ttl).Unix()
-	payload := base64.RawURLEncoding.EncodeToString([]byte(strconv.FormatInt(userID, 10) + "." + strconv.FormatInt(exp, 10)))
+	// nonce 保证每次登录 token 唯一（同一秒多次登录互不相同，支持单点登录互踢）
+	nonce := make([]byte, 16)
+	if _, err := rand.Read(nonce); err != nil {
+		return "", err
+	}
+	payload := base64.RawURLEncoding.EncodeToString([]byte(fmt.Sprintf("%d.%d.%s", userID, exp, hex.EncodeToString(nonce))))
 	sig := hmacSHA256Hex(secret, payload)
 	return payload + "." + sig, nil
 }
@@ -42,8 +54,8 @@ func VerifySessionToken(secret, token string) (int64, error) {
 	if err != nil {
 		return 0, ErrTokenInvalid
 	}
-	sub := strings.SplitN(string(raw), ".", 2)
-	if len(sub) != 2 {
+	sub := strings.SplitN(string(raw), ".", 3)
+	if len(sub) < 2 {
 		return 0, ErrTokenInvalid
 	}
 	userID, err := strconv.ParseInt(sub[0], 10, 64)
