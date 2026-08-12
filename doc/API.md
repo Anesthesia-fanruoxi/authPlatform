@@ -123,15 +123,16 @@ Body（旧格式兼容）: {"username":"alice","password":"密码","platform_id"
 - `single`（单次登录）：多选登录方式 = **任意其一**，客户端任选一种 `method` 通过即直接发 token（不走多步）。
 
 **响应**：
-- 单步 / single 模式：`{"code":0,"data":{"token":"...","expires_at":"...","user":{"uid","username","nickname","status"}}}`
-- two_step 需二步：`{"code":0,"data":{"login_ticket":"...","next":"username_totp"}}` → 调 4.2
+- 单步 / single 模式（任一方式通过）：`{"code":0,"data":{"token":"<64位hex>","expires_at":"...","user":{"uid","username","nickname","status"}}}`
+- two_step 且配置 ≥2 种方式（需二步）：`{"code":0,"data":{"ticket":"<5分钟有效>","step":1,"total_steps":2,"next_method":"username_totp","expires_in":300,"identifier":"..."}}` → 调 4.2
 
-### 4.2 TOTP 第二步 `POST /api/auth/verify-step`
+### 4.2 登录后续步骤 `POST /api/auth/verify-step`
 
 ```
-Body: {"ticket":"<上一步的 login_ticket>","method":"username_totp","credential":"6位动态码"}
-响应: 同单步登录（token + user）
+Body: {"platform_id":"ops-platform","ticket":"<上一步返回的 ticket>","credential":"<当前步骤凭证>"}
+响应: 未走完返回下一步（ticket + next_method）；最后一步通过返回 token（同单步响应）
 ```
+> 请求体**不含 method**：登录方式顺序由 ticket 关联的流程自动推进；`username_totp` 步传 6 位 TOTP 动态码。
 
 ### 4.3 平台代存 TOTP 绑定 `POST /api/auth/totp/save`
 
