@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"authplatform/common"
@@ -63,7 +64,24 @@ func (s *Server) Verify(w http.ResponseWriter, r *http.Request) {
 		Fail(w, CodeBadParam, "参数错误")
 		return
 	}
-	if method != first {
+	authMode := p.AuthMode
+	if authMode == "" {
+		authMode = common.AuthModeTwoStep
+	}
+	if authMode == common.AuthModeSingle {
+		// 单次登录：多选 = 任意其一，客户端任选一种方式即可（通过即发 token）
+		in := false
+		for _, m := range methods {
+			if m == method {
+				in = true
+				break
+			}
+		}
+		if !in {
+			Fail(w, CodeBadParam, "当前平台支持登录方式: "+strings.Join(methods, " / "))
+			return
+		}
+	} else if method != first {
 		Fail(w, CodeBadParam, "当前第一步登录方式为 "+first)
 		return
 	}
@@ -131,8 +149,8 @@ func (s *Server) Verify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 多步骤：签发 ticket 返回下一步
-	if len(methods) > 1 {
+	// 二次验证：签发 ticket 返回下一步（单次登录模式直接发 token，不走多步）
+	if len(methods) > 1 && authMode == common.AuthModeTwoStep {
 		tk, err := s.Tickets.Create(u.ID, p.ID, methods)
 		if err != nil {
 			s.internalError(w, err)

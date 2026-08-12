@@ -62,7 +62,7 @@ func (s *Server) UpdateSettings(w http.ResponseWriter, r *http.Request) {
 			Fail(w, CodeBadParam, "登录方式参数错误")
 			return
 		}
-		if _, err := common.ValidateLoginMethods(m.Methods); err != nil {
+		if _, err := common.ValidateLoginMethods(m.Methods, common.AuthModeTwoStep); err != nil {
 			Fail(w, CodeBadParam, err.Error())
 			return
 		}

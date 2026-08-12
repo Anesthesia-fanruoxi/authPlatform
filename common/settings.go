@@ -21,6 +21,12 @@ const (
 	LoginMethodEmailCode        = "email_code"        // 邮箱验证码（发码预留，可作第二因子）
 )
 
+// 平台验证模式（platforms.auth_mode）
+const (
+	AuthModeSingle  = "single"   // 单次登录：多选登录方式 = 任意其一通过即可
+	AuthModeTwoStep = "two_step" // 二次验证：多选登录方式 = 按顺序全部通过（默认）
+)
+
 // PasswordPolicy 密码安全设置。
 type PasswordPolicy struct {
 	MinLength      int  `json:"min_length"`
@@ -217,10 +223,24 @@ func AllLoginMethods() []string {
 	return []string{LoginMethodUsernamePassword, LoginMethodEmailPassword, LoginMethodPhoneCode, LoginMethodUsernameTOTP, LoginMethodTOTP}
 }
 
-// ValidateLoginMethods 校验登录方式列表合法性：
-// 非空、全部为已知方式、无重复、TOTP 不能单独作为登录方式。
+// ValidateAuthMode 校验验证模式，空值返回默认 two_step。
+func ValidateAuthMode(mode string) (string, error) {
+	if mode == "" {
+		return AuthModeTwoStep, nil
+	}
+	if mode != AuthModeSingle && mode != AuthModeTwoStep {
+		return "", errors.New("验证模式仅支持 single（单次登录）或 two_step（二次验证）")
+	}
+	return mode, nil
+}
+
+// ValidateLoginMethods 校验登录方式列表合法性（按验证模式区分语义）：
+//   - two_step（二次验证）：多选按顺序全部通过。TOTP 不能单独作为登录方式；username_totp 是完整方式不能与其他组合。
+//   - single（单次登录）：多选 = 任意其一即可。仅允许完整方式（username_password/email_password/phone_code/username_totp），
+//     TOTP/邮箱验证码这类仅第二因子的方式不允许。
+//
 // 返回规范化后的列表（保持传入顺序）。
-func ValidateLoginMethods(methods []string) ([]string, error) {
+func ValidateLoginMethods(methods []string, mode string) ([]string, error) {
 	allowed := AllLoginMethods()
 	if len(methods) == 0 {
 		return nil, errors.New("至少选择一种登录方式")
@@ -242,10 +262,19 @@ func ValidateLoginMethods(methods []string) ([]string, error) {
 		}
 		seen[method] = true
 	}
+	if mode == AuthModeSingle {
+		// 单次登录：只允许完整登录方式；TOTP/邮箱验证码仅作第二因子，不可用于单次登录
+		for _, m := range methods {
+			if m == LoginMethodTOTP || m == LoginMethodEmailCode {
+				return nil, errors.New("TOTP/邮箱验证码仅用于「二次验证」模式的第二因子，单次登录请使用 username_totp")
+			}
+		}
+		return methods, nil
+	}
+	// 二次验证：TOTP 不能单独；username_totp 是完整方式不能与其他组合
 	if len(methods) == 1 && methods[0] == LoginMethodTOTP {
 		return nil, errors.New("TOTP 双因子不能单独作为登录方式，请至少再选择一种")
 	}
-	// username_totp 本身已是完整登录方式（用户名 + TOTP），不能再与其他方式组合
 	if len(methods) > 1 {
 		for _, m := range methods {
 			if m == LoginMethodUsernameTOTP {

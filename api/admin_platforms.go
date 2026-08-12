@@ -26,6 +26,7 @@ func safePlatform(p *model.Platform, masterKey string, showSecret bool) map[stri
 		"created_at":           p.CreatedAt.Format(time.RFC3339),
 		"login_methods":        platformLoginMethods(p),
 		"login_methods_custom": p.LoginMethods != "",
+		"auth_mode":            p.AuthMode,
 	}
 	if plain, err := common.DecryptSecret(masterKey, p.SecretEnc); err == nil {
 		if showSecret {
@@ -76,6 +77,7 @@ func (s *Server) CreatePlatform(w http.ResponseWriter, r *http.Request) {
 		Name         string   `json:"name"`
 		IPWhitelist  string   `json:"ip_whitelist"`
 		LoginMethods []string `json:"login_methods"`
+		AuthMode     string   `json:"auth_mode"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.PlatformID == "" || req.Name == "" {
 		Fail(w, CodeBadParam, "参数错误")
@@ -85,9 +87,14 @@ func (s *Server) CreatePlatform(w http.ResponseWriter, r *http.Request) {
 		Fail(w, CodeBadParam, "platform_id 只能包含小写字母、数字和连字符")
 		return
 	}
+	authMode, err := common.ValidateAuthMode(req.AuthMode)
+	if err != nil {
+		Fail(w, CodeBadParam, err.Error())
+		return
+	}
 	var lmText string
 	if len(req.LoginMethods) > 0 {
-		if _, err := common.ValidateLoginMethods(req.LoginMethods); err != nil {
+		if _, err := common.ValidateLoginMethods(req.LoginMethods, authMode); err != nil {
 			Fail(w, CodeBadParam, err.Error())
 			return
 		}
@@ -110,6 +117,7 @@ func (s *Server) CreatePlatform(w http.ResponseWriter, r *http.Request) {
 		SecretEnc:    enc,
 		IPWhitelist:  req.IPWhitelist,
 		LoginMethods: lmText,
+		AuthMode:     authMode,
 		Status:       1,
 	}
 	if err := s.Platforms.Create(r.Context(), p); err != nil {
@@ -137,6 +145,7 @@ func (s *Server) UpdatePlatform(w http.ResponseWriter, r *http.Request) {
 		Status       *int      `json:"status"`
 		IPWhitelist  *string   `json:"ip_whitelist"`
 		LoginMethods *[]string `json:"login_methods"` // nil=不改；空数组=清除（用全局默认）
+		AuthMode     *string   `json:"auth_mode"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		Fail(w, CodeBadParam, "参数错误")
@@ -152,11 +161,23 @@ func (s *Server) UpdatePlatform(w http.ResponseWriter, r *http.Request) {
 	if req.IPWhitelist != nil {
 		updates["ip_whitelist"] = *req.IPWhitelist
 	}
+	if req.AuthMode != nil {
+		mode, err := common.ValidateAuthMode(*req.AuthMode)
+		if err != nil {
+			Fail(w, CodeBadParam, err.Error())
+			return
+		}
+		updates["auth_mode"] = mode
+	}
 	if req.LoginMethods != nil {
 		if len(*req.LoginMethods) == 0 {
 			updates["login_methods"] = "" // 清除，回退全局默认
 		} else {
-			if _, err := common.ValidateLoginMethods(*req.LoginMethods); err != nil {
+			mode := common.AuthModeTwoStep
+			if req.AuthMode != nil {
+				mode = *req.AuthMode
+			}
+			if _, err := common.ValidateLoginMethods(*req.LoginMethods, mode); err != nil {
 				Fail(w, CodeBadParam, err.Error())
 				return
 			}

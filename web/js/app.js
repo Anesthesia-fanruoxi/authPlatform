@@ -487,10 +487,14 @@ const PlatformsPage = {
           <el-input v-model="dlg.form.ip_whitelist" placeholder='JSON 数组，如 ["1.2.3.4"]，留空不限制' />
         </el-form-item>
         <el-form-item label="登录方式">
+          <el-radio-group v-model="dlg.form.auth_mode" style="margin-bottom:8px">
+            <el-radio value="single">单次登录（多选 = 任意其一）</el-radio>
+            <el-radio value="two_step">二次验证（多选 = 按顺序全部通过）</el-radio>
+          </el-radio-group>
           <el-checkbox-group v-model="dlg.form.login_methods" style="display:flex;flex-direction:column;gap:8px">
             <el-checkbox v-for="m in methodOptions" :key="m.value" :label="m.value">{{ m.label }}</el-checkbox>
           </el-checkbox-group>
-          <div class="settings-tip">留空 = 使用系统设置中的「新平台默认登录方式」；多选 = 多步骤验证。</div>
+          <div class="settings-tip">留空 = 使用系统设置中的「新平台默认登录方式」；单次登录多选 = 任一方式通过即可；二次验证多选 = 按勾选顺序逐步验证。</div>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -514,7 +518,7 @@ const PlatformsPage = {
     const platforms = ref([]);
     const loading = ref(false);
     const { tableHeight, boxRef } = useTableFill();
-    const dlg = reactive({ visible: false, isEdit: false, saving: false, form: { id: 0, platform_id: '', name: '', ip_whitelist: '', login_methods: [] } });
+    const dlg = reactive({ visible: false, isEdit: false, saving: false, form: { id: 0, platform_id: '', name: '', ip_whitelist: '', login_methods: [], auth_mode: 'two_step' } });
     const secretDlg = reactive({ visible: false, secret: '' });
     const methodOptions = LOGIN_METHOD_OPTIONS;
 
@@ -530,22 +534,22 @@ const PlatformsPage = {
 
     function openCreate() {
       dlg.isEdit = false;
-      dlg.form = { id: 0, platform_id: '', name: '', ip_whitelist: '', login_methods: [] };
+      dlg.form = { id: 0, platform_id: '', name: '', ip_whitelist: '', login_methods: [], auth_mode: 'two_step' };
       dlg.visible = true;
     }
     function openEdit(row) {
       dlg.isEdit = true;
-      dlg.form = { id: row.id, platform_id: row.platform_id, name: row.name, ip_whitelist: row.ip_whitelist || '', login_methods: row.login_methods_custom ? [...(row.login_methods || [])] : [] };
+      dlg.form = { id: row.id, platform_id: row.platform_id, name: row.name, ip_whitelist: row.ip_whitelist || '', login_methods: row.login_methods_custom ? [...(row.login_methods || [])] : [], auth_mode: row.auth_mode || 'two_step' };
       dlg.visible = true;
     }
     async function save() {
       dlg.saving = true;
       try {
         if (dlg.isEdit) {
-          await api.updatePlatform(dlg.form.id, { name: dlg.form.name, ip_whitelist: dlg.form.ip_whitelist, login_methods: dlg.form.login_methods });
+          await api.updatePlatform(dlg.form.id, { name: dlg.form.name, ip_whitelist: dlg.form.ip_whitelist, login_methods: dlg.form.login_methods, auth_mode: dlg.form.auth_mode });
           ElMessage.success('保存成功');
         } else {
-          const data = await api.createPlatform({ platform_id: dlg.form.platform_id, name: dlg.form.name, ip_whitelist: dlg.form.ip_whitelist, login_methods: dlg.form.login_methods });
+          const data = await api.createPlatform({ platform_id: dlg.form.platform_id, name: dlg.form.name, ip_whitelist: dlg.form.ip_whitelist, login_methods: dlg.form.login_methods, auth_mode: dlg.form.auth_mode });
           secretDlg.secret = data.secret;
           secretDlg.visible = true;
         }

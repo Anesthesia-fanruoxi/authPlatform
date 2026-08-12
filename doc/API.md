@@ -91,8 +91,8 @@ GET /api/admin/me        Headers: Authorization: Bearer <token>
 | 方法 | 路径 | 说明 |
 |---|---|---|
 | GET | `/api/admin/platforms` | 平台列表（含 `secret_masked`） |
-| POST | `/api/admin/platforms` | 创建：`{"platform_id","name","login_methods":[...]}` |
-| PUT | `/api/admin/platforms/{id}` | 更新（`login_methods`、`ip_whitelist` 等） |
+| POST | `/api/admin/platforms` | 创建：`{"platform_id","name","login_methods":[...],"auth_mode":"single|two_step"}` |
+| PUT | `/api/admin/platforms/{id}` | 更新（`login_methods`、`auth_mode`、`ip_whitelist` 等） |
 | POST | `/api/admin/platforms/{id}/rotate-secret` | 轮换密钥（返回新 secret） |
 | DELETE | `/api/admin/platforms/{id}` | 删除平台 |
 
@@ -118,9 +118,13 @@ Body（旧格式兼容）: {"username":"alice","password":"密码","platform_id"
 ```
 登录方式 `method`：`username_password`（默认）、`username_totp`（用户名+TOTP 验证码，无密码）、`email_password`、`phone_code`。
 
+**验证模式**（平台配置 `auth_mode`）：
+- `two_step`（二次验证，默认）：多选登录方式 = **按顺序全部通过**，第一步过 → `ticket` → 第二步过 → token。
+- `single`（单次登录）：多选登录方式 = **任意其一**，客户端任选一种 `method` 通过即直接发 token（不走多步）。
+
 **响应**：
-- 单步登录：`{"code":0,"data":{"token":"...","expires_at":"...","user":{"uid","username","nickname","status"}}}`
-- 需二步（平台配置了多因素）：`{"code":0,"data":{"login_ticket":"...","next":"totp"}}` → 调 4.2
+- 单步 / single 模式：`{"code":0,"data":{"token":"...","expires_at":"...","user":{"uid","username","nickname","status"}}}`
+- two_step 需二步：`{"code":0,"data":{"login_ticket":"...","next":"totp"}}` → 调 4.2
 
 ### 4.2 TOTP 第二步 `POST /api/auth/verify-step`
 
@@ -156,7 +160,7 @@ console.log(r);                        // code=0，data.token 即管理端 Beare
 
 ### 5.2 平台签名登录（模拟平台转发）
 
-> `method` 必须在该平台配置的 `login_methods` 内（管理后台「平台管理」可查）；返回 1007「当前第一步登录方式为 xxx」即签名已通过、仅方式不匹配，改用平台配置的方式即可。
+> `method` 必须在该平台配置的 `login_methods` 内（管理后台「平台管理」可查）；`single` 模式返回 1007「当前平台支持登录方式: a / b」、`two_step` 模式返回 1007「当前第一步登录方式为 xxx」即签名已通过、仅方式不匹配，改用平台配置的方式即可。
 
 ```js
 const SECRET = '你的平台secret';        // 认证中心「平台管理」里注册/轮换得到
@@ -169,6 +173,6 @@ console.log(r);                        // code=0 -> data.token
 
 ## 6. 常见问题
 
-- **登录方式不匹配**：`verify` 的 `method` 必须在该平台配置的 `login_methods` 内（平台管理页配置）；`username_totp` 用户需已绑定 TOTP，否则返回"该账号未启用 TOTP"。
+- **登录方式不匹配**：`verify` 的 `method` 必须在该平台配置的 `login_methods` 内（平台管理页配置）；`single` 模式任一方式通过即可，`two_step` 模式按勾选顺序逐步验证；`username_totp` 用户需已绑定 TOTP，否则返回"该账号未启用 TOTP"。
 - **签名失败 1001**：检查 secret 是否正确、`X-Timestamp` 是否 ±300s 内、签名串的 URI 是否与请求完全一致（含 query）、body 是否与签名时一致。
 - **限流 1005**：同一账号 5 次失败锁 15 分钟（账号维度）。
