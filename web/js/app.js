@@ -165,38 +165,64 @@ const UsersPage = {
           </div>
         </div>
       </template>
-      <div class="plat-grid" v-loading="loading">
-        <div class="plat-card" v-for="row in platforms" :key="row.id">
-          <div class="plat-card-top">
-            <span class="plat-id">{{ row.platform_id }}</span>
-            <el-tag :type="row.status === 1 ? 'success' : 'danger'" effect="light" round size="small">{{ row.status === 1 ? '启用' : '停用' }}</el-tag>
-          </div>
-          <div class="plat-name">{{ row.name }}</div>
-          <div class="plat-meta">
-            <el-tag :type="row.auth_mode === 'single' ? 'primary' : 'success'" effect="light" round size="small">
-              {{ row.auth_mode === 'single' ? '单次登录' : '二次验证' }}
+      <div class="table-box" ref="boxRef">
+      <el-table :data="users" v-loading="loading" stripe :height="tableHeight" row-key="id" @selection-change="onSelectionChange">
+        <el-table-column type="selection" width="44" />
+        <el-table-column prop="uid" label="UID" width="230">
+          <template #default="{row}"><span style="font-family:Consolas,Menlo,monospace;font-size:12px;color:#5a6b82">{{ row.uid }}</span></template>
+        </el-table-column>
+        <el-table-column label="用户名">
+          <template #default="{row}">
+            <span class="cell-user">
+              <span class="avatar" :style="avatarStyle(row)">{{ (row.nickname || row.username).slice(0,1) }}</span>
+              <b>{{ row.username }}</b>
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="nickname" label="昵称" />
+        <el-table-column label="手机号" min-width="120">
+          <template #default="{row}"><span style="color:#5a6b82">{{ row.phone || '—' }}</span></template>
+        </el-table-column>
+        <el-table-column label="邮箱" min-width="160">
+          <template #default="{row}"><span style="color:#5a6b82">{{ row.email || '—' }}</span></template>
+        </el-table-column>
+        <el-table-column label="状态" width="90" align="center">
+          <template #default="{row}">
+            <el-tag :type="row.status === 1 ? 'success' : 'danger'" effect="light" round>
+              {{ row.status === 1 ? '启用' : '禁用' }}
             </el-tag>
-            <span class="plat-time">{{ row.created_at }}</span>
-          </div>
-          <div class="plat-methods">
-            <template v-if="row.login_methods_custom && row.login_methods && row.login_methods.length">
-              <el-tag v-for="m in row.login_methods" :key="m" size="small" type="primary" effect="plain" round>{{ loginMethodLabel(m) }}</el-tag>
-            </template>
-            <el-tag v-else size="small" type="info" effect="plain" round>系统默认</el-tag>
-          </div>
-          <div class="plat-secret">
-            <span class="plat-secret-key">加密盐</span>
-            <code>{{ row.secret_masked || '***' }}</code>
-            <el-tag v-if="row.has_old_secret" type="warning" size="small" effect="light" round>过渡期</el-tag>
-          </div>
-          <div class="plat-actions">
+          </template>
+        </el-table-column>
+        <el-table-column label="分类" width="100" align="center">
+          <template #default="{row}">
+            <el-tag v-if="row.category" effect="plain" round>{{ row.category }}</el-tag>
+            <span v-else style="color:#8a97ab">未分类</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="双因子" width="100" align="center">
+          <template #default="{row}">
+            <el-tag v-if="row.totp_enabled" type="success" effect="light" round>已启用</el-tag>
+            <span v-else style="color:#8a97ab">未启用</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="created_at" label="创建时间" width="190" />
+        <el-table-column label="操作" width="300" align="center">
+          <template #default="{row}">
             <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
-            <el-button link type="warning" @click="rotate(row)">轮换密钥</el-button>
-            <el-button link :type="row.status === 1 ? 'danger' : 'success'" @click="toggleStatus(row)">{{ row.status === 1 ? '停用' : '启用' }}</el-button>
+            <el-button link :type="row.status === 1 ? 'danger' : 'success'" @click="toggleStatus(row)">
+              {{ row.status === 1 ? '禁用' : '启用' }}
+            </el-button>
+            <el-button link type="warning" @click="openReset(row)">重置密码</el-button>
             <el-button link type="danger" @click="del(row)">删除</el-button>
+          </template>
+        </el-table-column>
+        <template #empty>
+          <div class="table-empty">
+            <span class="table-empty-ic">${svg('users')}</span>
+            <p>暂无用户数据</p>
           </div>
-        </div>
-        <div v-if="!loading && !platforms.length" class="plat-empty">暂无平台数据，点击右上角注册平台</div>
+        </template>
+      </el-table>
       </div>
     </el-card>
 
@@ -404,56 +430,38 @@ const PlatformsPage = {
           <el-button type="primary" @click="openCreate">注册平台</el-button>
         </div>
       </template>
-      <div class="table-box" ref="boxRef">
-      <el-table :data="platforms" v-loading="loading" stripe :height="tableHeight">
-        <el-table-column prop="platform_id" label="平台标识" width="160">
-          <template #default="{row}"><span style="font-family:Consolas,Menlo,monospace;color:#2f6fed">{{ row.platform_id }}</span></template>
-        </el-table-column>
-        <el-table-column prop="name" label="名称" />
-        <el-table-column label="登录方式" min-width="170">
-          <template #default="{row}">
-            <template v-if="row.login_methods_custom && row.login_methods && row.login_methods.length">
-              <el-tag v-for="m in row.login_methods" :key="m" size="small" type="primary" effect="plain" round style="margin-right:4px">{{ loginMethodLabel(m) }}</el-tag>
-            </template>
-            <el-tag v-else size="small" type="info" effect="plain" round>系统默认</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="验证模式" width="130" align="center">
-          <template #default="{row}">
-            <el-tag :type="row.auth_mode === 'single' ? 'primary' : 'success'" effect="light" round>
+      <div class="plat-grid" v-loading="loading">
+        <div class="plat-card" v-for="row in platforms" :key="row.id">
+          <div class="plat-card-top">
+            <span class="plat-id">{{ row.platform_id }}</span>
+            <el-tag :type="row.status === 1 ? 'success' : 'danger'" effect="light" round size="small">{{ row.status === 1 ? '启用' : '停用' }}</el-tag>
+          </div>
+          <div class="plat-name">{{ row.name }}</div>
+          <div class="plat-meta">
+            <el-tag :type="row.auth_mode === 'single' ? 'primary' : 'success'" effect="light" round size="small">
               {{ row.auth_mode === 'single' ? '单次登录' : '二次验证' }}
             </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="加密盐" width="190">
-          <template #default="{row}">
-            <span style="font-family:Consolas,Menlo,monospace;font-size:12px;color:#5a6b82">{{ row.secret_masked || '***' }}</span>
-            <el-tag v-if="row.has_old_secret" type="warning" size="small" effect="light" round style="margin-left:6px">过渡期</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="状态" width="90" align="center">
-          <template #default="{row}">
-            <el-tag :type="row.status === 1 ? 'success' : 'danger'" effect="light" round>{{ row.status === 1 ? '启用' : '停用' }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="created_at" label="创建时间" width="190" />
-        <el-table-column label="操作" width="300" align="center">
-          <template #default="{row}">
+            <span class="plat-time">{{ row.created_at }}</span>
+          </div>
+          <div class="plat-methods">
+            <template v-if="row.login_methods_custom && row.login_methods && row.login_methods.length">
+              <el-tag v-for="m in row.login_methods" :key="m" size="small" type="primary" effect="plain" round>{{ loginMethodLabel(m) }}</el-tag>
+            </template>
+            <el-tag v-else size="small" type="info" effect="plain" round>系统默认</el-tag>
+          </div>
+          <div class="plat-secret">
+            <span class="plat-secret-key">加密盐</span>
+            <code>{{ row.secret_masked || '***' }}</code>
+            <el-tag v-if="row.has_old_secret" type="warning" size="small" effect="light" round>过渡期</el-tag>
+          </div>
+          <div class="plat-actions">
             <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
             <el-button link type="warning" @click="rotate(row)">轮换密钥</el-button>
-            <el-button link :type="row.status === 1 ? 'danger' : 'success'" @click="toggleStatus(row)">
-              {{ row.status === 1 ? '停用' : '启用' }}
-            </el-button>
+            <el-button link :type="row.status === 1 ? 'danger' : 'success'" @click="toggleStatus(row)">{{ row.status === 1 ? '停用' : '启用' }}</el-button>
             <el-button link type="danger" @click="del(row)">删除</el-button>
-          </template>
-        </el-table-column>
-        <template #empty>
-          <div class="table-empty">
-            <span class="table-empty-ic">${svg('grid')}</span>
-            <p>暂无平台数据，点击右上角注册平台</p>
           </div>
-        </template>
-      </el-table>
+        </div>
+        <div v-if="!loading && !platforms.length" class="plat-empty">暂无平台数据，点击右上角注册平台</div>
       </div>
     </el-card>
 
