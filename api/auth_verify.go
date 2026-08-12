@@ -22,13 +22,9 @@ const totpTicketTTL = 5 * time.Minute
 // verifyRequest 登录第一步（或单步）请求体。
 type verifyRequest struct {
 	PlatformID string `json:"platform_id"`
-	// 方式与凭证（新格式）。缺省 method 时按旧格式解析 username/password。
 	Method     string `json:"method"`
 	Identifier string `json:"identifier"`
 	Credential string `json:"credential"`
-	// 旧格式兼容：username + password
-	Username string `json:"username"`
-	Password string `json:"password"`
 }
 
 // Verify POST /api/auth/verify 平台转发登录校验：
@@ -55,10 +51,7 @@ func (s *Server) Verify(w http.ResponseWriter, r *http.Request) {
 
 	method, identifier, credential := req.Method, req.Identifier, req.Credential
 	if method == "" {
-		// 兼容旧格式 {username, password}
-		method = common.LoginMethodUsernamePassword
-		identifier = req.Username
-		credential = req.Password
+		method = common.LoginMethodUsernamePassword // 缺省 method 默认用户名+密码
 	}
 	if identifier == "" || credential == "" {
 		Fail(w, CodeBadParam, "参数错误")

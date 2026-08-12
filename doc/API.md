@@ -113,8 +113,7 @@ GET /api/admin/me        Headers: Authorization: Bearer <token>
 
 ```
 Headers: X-Platform-Id / X-Timestamp / X-Sign
-Body（新格式）: {"platform_id":"ops-platforms","method":"username_password","identifier":"alice","credential":"密码"}
-Body（旧格式兼容）: {"username":"alice","password":"密码","platform_id":"ops-platforms"}
+Body: {"platform_id":"ops-platforms","method":"username_password","identifier":"alice","credential":"密码"}
 ```
 登录方式 `method`：`username_password`（默认）、`email_password`、`phone_code`、`username_totp`（用户名+TOTP 验证码，无密码）。
 
