@@ -1294,8 +1294,9 @@ const Root = {
       mePwdDlg.saving = true;
       try {
         await api.meChangePassword(mePwdDlg.old, mePwdDlg.newp);
-        ElMessage.success('密码已修改');
         mePwdDlg.visible = false;
+        logout(); // 密码已变更，旧会话失效，退出重新登录
+        ElMessage.success('密码已修改，请重新登录');
       } catch (e) { ElMessage.error(e.message); }
       finally { mePwdDlg.saving = false; }
     }
