@@ -433,15 +433,20 @@ const PlatformsPage = {
       <div class="plat-grid" v-loading="loading">
         <div class="plat-card" v-for="row in platforms" :key="row.id">
           <div class="plat-card-top">
-            <span class="plat-id">{{ row.platform_id }}</span>
+            <div class="plat-id-wrap">
+              <span class="plat-avatar">{{ (row.name || row.platform_id).slice(0, 1).toUpperCase() }}</span>
+              <div class="plat-id-info">
+                <span class="plat-id">{{ row.platform_id }}</span>
+                <span class="plat-name">{{ row.name }}</span>
+              </div>
+            </div>
             <el-tag :type="row.status === 1 ? 'success' : 'danger'" effect="light" round size="small">{{ row.status === 1 ? '启用' : '停用' }}</el-tag>
           </div>
-          <div class="plat-name">{{ row.name }}</div>
           <div class="plat-meta">
             <el-tag :type="row.auth_mode === 'single' ? 'primary' : 'success'" effect="light" round size="small">
               {{ row.auth_mode === 'single' ? '单次登录' : '二次验证' }}
             </el-tag>
-            <span class="plat-time">{{ row.created_at }}</span>
+            <span class="plat-mode-hint">{{ row.auth_mode === 'single' ? '任一方式通过即可' : '按勾选顺序逐步验证' }}</span>
           </div>
           <div class="plat-methods">
             <template v-if="row.login_methods_custom && row.login_methods && row.login_methods.length">
