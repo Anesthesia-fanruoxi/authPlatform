@@ -444,6 +444,13 @@ const PlatformsPage = {
             <el-tag v-else size="small" type="info" effect="plain" round>系统默认</el-tag>
           </template>
         </el-table-column>
+        <el-table-column label="验证模式" width="130" align="center">
+          <template #default="{row}">
+            <el-tag :type="row.auth_mode === 'single' ? 'primary' : 'success'" effect="light" round>
+              {{ row.auth_mode === 'single' ? '单次登录' : '二次验证' }}
+            </el-tag>
+          </template>
+        </el-table-column>
         <el-table-column label="加密盐" width="190">
           <template #default="{row}">
             <span style="font-family:Consolas,Menlo,monospace;font-size:12px;color:#5a6b82">{{ row.secret_masked || '***' }}</span>
