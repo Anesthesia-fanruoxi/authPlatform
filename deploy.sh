@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
 # 一键部署：编译 linux 二进制 → 创建 /data/authPlatform → 生成 systemd service 并启动。
 # 用法：将代码拷贝到服务器后执行 sudo bash deploy.sh（服务器需 Go 1.25+）
-# 端口：默认 8080，通过 service 环境变量注入（yaml 不指定），自定义：sudo PORT=9000 bash deploy.sh
+# 端口：默认 8080，通过 service 环境变量注入（yaml 不指定），自定义：sudo bash deploy.sh 9000
 set -euo pipefail
 
 APP=authPlatform
 SRC_DIR=$(cd "$(dirname "$0")" && pwd)
 INSTALL_DIR=/data/authPlatform
 SERVICE_FILE=/etc/systemd/system/${APP}.service
-PORT=${PORT:-8080}
+PORT=${1:-8080}
+case "$PORT" in ''|*[!0-9]*) echo "端口参数必须为数字，用法: sudo bash deploy.sh [端口]"; exit 1;; esac
 
 [ "$(id -u)" -eq 0 ] || { echo "请用 root/sudo 执行"; exit 1; }
 command -v go >/dev/null 2>&1 || { echo "未检测到 Go 环境，请先安装 Go 1.25+"; exit 1; }
@@ -47,7 +48,7 @@ EOF
 # 4. 端口占用检查：本服务占用则 restart 会释放；被其他进程占用则中止
 if ! systemctl is-active --quiet "$APP" && command -v ss >/dev/null 2>&1; then
   if ss -ltn | awk '{print $4}' | grep -qE "[:.]${PORT}$"; then
-    echo "端口 ${PORT} 已被其他进程占用，请先释放或换端口重试：sudo PORT=<新端口> bash deploy.sh"
+    echo "端口 ${PORT} 已被其他进程占用，请先释放或换端口重试：sudo bash deploy.sh <新端口>"
     exit 1
   fi
 fi
