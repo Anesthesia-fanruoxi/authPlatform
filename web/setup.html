@@ -211,8 +211,8 @@ createApp({
         });
         const data = await resp.json();
         if (data.code === 0) {
-          ElMessage.success('配置已保存并生效，页面将在 3 秒后进入登录页');
-          setTimeout(() => location.reload(), 3000);
+          ElMessage.success('配置已保存并生效，页面将在 1 秒后进入登录页');
+          setTimeout(() => location.reload(), 1000);
         } else {
           ElMessage.error(data.msg || '保存失败');
         }
