@@ -111,7 +111,7 @@ func buildYAMLConfig(req setupRequest) *config.YAMLConfig {
 		adminUser = "admin"
 	}
 	yc := &config.YAMLConfig{}
-	yc.App.Addr = ":8080"
+	// addr 不写入 yaml：端口由部署侧（systemd Environment=APP_ADDR）指定，缺省 :8080
 	yc.App.Name = "authPlatform"
 	yc.Database.Host = nonEmptyStr(req.DBHost, "127.0.0.1")
 	yc.Database.Port = port
