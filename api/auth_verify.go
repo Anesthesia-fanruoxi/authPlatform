@@ -16,9 +16,6 @@ import (
 // tokenTTLHint 签发 token 的建议有效期（平台侧自行管理生命周期，此值仅为参考）。
 const tokenTTLHint = 24 * time.Hour
 
-// totpTicketTTL 2FA 待验证会话 ticket 有效期（5 分钟，无状态签名）。
-const totpTicketTTL = 5 * time.Minute
-
 // verifyRequest 登录第一步（或单步）请求体。
 type verifyRequest struct {
 	PlatformID string `json:"platform_id"`
@@ -115,7 +112,7 @@ func (s *Server) Verify(w http.ResponseWriter, r *http.Request) {
 			Fail(w, CodeBadCred, "账号或密码错误")
 			return
 		}
-		s.internalError(w, err)
+		s.internalError(w, r, err)
 		return
 	}
 	// 限流 + 黑名单（账号维度，统一按 username 计数）
@@ -131,7 +128,7 @@ func (s *Server) Verify(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 验证第一步凭证
-	okCred, reason, failMsg := s.verifyCredential(r.Context(), u, method, identifier, credential)
+	okCred, reason, failMsg := s.verifyCredential(u, method, identifier, credential)
 	if !okCred {
 		s.Limiter.RecordFail(u.Username)
 		audit(0, reason)
@@ -145,7 +142,7 @@ func (s *Server) Verify(w http.ResponseWriter, r *http.Request) {
 	}
 	granted, err := s.Grants.Granted(r.Context(), u.ID, p.ID)
 	if err != nil {
-		s.internalError(w, err)
+		s.internalError(w, r, err)
 		return
 	}
 	if !granted {
@@ -158,7 +155,7 @@ func (s *Server) Verify(w http.ResponseWriter, r *http.Request) {
 	if len(methods) > 1 && authMode == common.AuthModeTwoStep {
 		tk, err := s.Tickets.Create(u.ID, p.ID, methods)
 		if err != nil {
-			s.internalError(w, err)
+			s.internalError(w, r, err)
 			return
 		}
 		s.Tickets.MarkDone(tk, method)
@@ -177,7 +174,7 @@ func (s *Server) Verify(w http.ResponseWriter, r *http.Request) {
 	// 单步：直接签发 token
 	s.Limiter.Reset(u.Username)
 	audit(1, "ok")
-	s.issueToken(w, r, u, p)
+	s.issueToken(w, r, u)
 }
 
 // VerifyStep POST /api/auth/verify-step 登录后续步骤：
@@ -231,7 +228,7 @@ func (s *Server) VerifyStep(w http.ResponseWriter, r *http.Request) {
 	u, err := s.Users.GetByID(r.Context(), t.UserID)
 	if err != nil {
 		s.Tickets.Delete(req.Ticket)
-		s.internalError(w, err)
+		s.internalError(w, r, err)
 		return
 	}
 	if u.Status != 1 {
@@ -251,7 +248,7 @@ func (s *Server) VerifyStep(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	okCred, reason, failMsg := s.verifyCredential(r.Context(), u, next, identifierForMethod(u, next), req.Credential)
+	okCred, reason, failMsg := s.verifyCredential(u, next, identifierForMethod(u, next), req.Credential)
 	if !okCred {
 		// 凭证失败：保留 ticket 允许重试（限流兜底），不销毁登录流程
 		s.Limiter.RecordFail(u.Username)
@@ -279,7 +276,7 @@ func (s *Server) VerifyStep(w http.ResponseWriter, r *http.Request) {
 	s.Tickets.Delete(req.Ticket)
 	s.Limiter.Reset(u.Username)
 	auditAll(u.Username, p.PlatformID, 1, "ok")
-	s.issueToken(w, r, u, p)
+	s.issueToken(w, r, u)
 }
 
 // SendCode POST /api/auth/send-code 发送登录验证码（手机号/邮箱）。
@@ -332,7 +329,7 @@ func (s *Server) SendCode(w http.ResponseWriter, r *http.Request) {
 			Fail(w, CodeBadCred, "账号不存在或已停用")
 			return
 		}
-		s.internalError(w, err)
+		s.internalError(w, r, err)
 		return
 	}
 	if u.Status != 1 {
@@ -342,7 +339,7 @@ func (s *Server) SendCode(w http.ResponseWriter, r *http.Request) {
 	}
 	code, err := s.VerCodes.Generate(req.Method, req.Identifier)
 	if err != nil {
-		s.internalError(w, err)
+		s.internalError(w, r, err)
 		return
 	}
 	// dev 模式：验证码直接返回，便于联调（上线接入真实发送器后删除此字段）
@@ -368,7 +365,7 @@ func (s *Server) platformMethods(ctx context.Context, p *model.Platform) []strin
 }
 
 // verifyCredential 校验单个登录方式的凭证。返回 (是否通过, 审计reason, 失败提示)。
-func (s *Server) verifyCredential(ctx context.Context, u *model.User, method, identifier, credential string) (bool, string, string) {
+func (s *Server) verifyCredential(u *model.User, method, identifier, credential string) (bool, string, string) {
 	switch method {
 	case common.LoginMethodUsernamePassword:
 		if u.Username != identifier {
@@ -440,10 +437,10 @@ func strPtrEq(p *string, s string) bool {
 
 // issueToken 签发不透明 token 并返回统一登录成功响应。
 // 是否强制改密等业务规则由平台侧自行维护，认证中心只负责校验与签发。
-func (s *Server) issueToken(w http.ResponseWriter, r *http.Request, u *model.User, p *model.Platform) {
+func (s *Server) issueToken(w http.ResponseWriter, r *http.Request, u *model.User) {
 	token, err := common.NewOpaqueToken()
 	if err != nil {
-		s.internalError(w, err)
+		s.internalError(w, r, err)
 		return
 	}
 	OK(w, map[string]any{

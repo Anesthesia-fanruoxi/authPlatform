@@ -20,7 +20,7 @@ func (s *Server) GetUserByUID(w http.ResponseWriter, r *http.Request) {
 			http.NotFound(w, r)
 			return
 		}
-		s.internalError(w, err)
+		s.internalError(w, r, err)
 		return
 	}
 	if u.IsAdmin {
@@ -30,7 +30,7 @@ func (s *Server) GetUserByUID(w http.ResponseWriter, r *http.Request) {
 	}
 	granted, err := s.Grants.Granted(r.Context(), u.ID, p.ID)
 	if err != nil {
-		s.internalError(w, err)
+		s.internalError(w, r, err)
 		return
 	}
 	if !granted {
@@ -49,7 +49,7 @@ func (s *Server) ListUsersForPlatform(w http.ResponseWriter, r *http.Request) {
 	}
 	grants, err := s.Grants.GetByPlatform(r.Context(), p.ID)
 	if err != nil {
-		s.internalError(w, err)
+		s.internalError(w, r, err)
 		return
 	}
 	ids := make([]int64, 0, len(grants))
@@ -58,7 +58,7 @@ func (s *Server) ListUsersForPlatform(w http.ResponseWriter, r *http.Request) {
 	}
 	users, err := s.Users.ListByIDs(r.Context(), ids, r.URL.Query().Get("keyword"))
 	if err != nil {
-		s.internalError(w, err)
+		s.internalError(w, r, err)
 		return
 	}
 	safe := make([]map[string]any, 0, len(users))

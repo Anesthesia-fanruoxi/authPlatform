@@ -30,7 +30,7 @@ func (s *Server) SetPlatformGrants(w http.ResponseWriter, r *http.Request) {
 				Fail(w, CodeBadParam, "用户不存在")
 				return
 			}
-			s.internalError(w, err)
+			s.internalError(w, r, err)
 			return
 		}
 	}
@@ -40,7 +40,7 @@ func (s *Server) SetPlatformGrants(w http.ResponseWriter, r *http.Request) {
 		err = s.Grants.RevokeUsers(r.Context(), id, req.UserIDs)
 	}
 	if err != nil {
-		s.internalError(w, err)
+		s.internalError(w, r, err)
 		return
 	}
 	OK(w, nil)
@@ -51,17 +51,17 @@ func (s *Server) SetPlatformGrants(w http.ResponseWriter, r *http.Request) {
 func (s *Server) GrantsMatrix(w http.ResponseWriter, r *http.Request) {
 	users, err := s.Users.List(r.Context(), common.UserFilter{ExcludeAdmin: true, Category: r.URL.Query().Get("category")})
 	if err != nil {
-		s.internalError(w, err)
+		s.internalError(w, r, err)
 		return
 	}
 	platforms, err := s.Platforms.List(r.Context())
 	if err != nil {
-		s.internalError(w, err)
+		s.internalError(w, r, err)
 		return
 	}
 	grants, err := s.Grants.ListAll(r.Context())
 	if err != nil {
-		s.internalError(w, err)
+		s.internalError(w, r, err)
 		return
 	}
 
@@ -116,11 +116,11 @@ func (s *Server) SetUserGrants(w http.ResponseWriter, r *http.Request) {
 			Fail(w, CodeBadParam, "用户不存在")
 			return
 		}
-		s.internalError(w, err)
+		s.internalError(w, r, err)
 		return
 	}
 	if err := s.Grants.SetForUser(r.Context(), id, req.PlatformIDs); err != nil {
-		s.internalError(w, err)
+		s.internalError(w, r, err)
 		return
 	}
 	OK(w, nil)

@@ -31,7 +31,7 @@ func (s *Server) BatchSetCategory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.Users.UpdateCategory(r.Context(), req.UserIDs, req.Category); err != nil {
-		s.internalError(w, err)
+		s.internalError(w, r, err)
 		return
 	}
 	OK(w, nil)
@@ -62,7 +62,7 @@ func (s *Server) ListUsers(w http.ResponseWriter, r *http.Request) {
 	}
 	users, err := s.Users.List(r.Context(), f)
 	if err != nil {
-		s.internalError(w, err)
+		s.internalError(w, r, err)
 		return
 	}
 	safe := make([]map[string]any, 0, len(users))
@@ -94,12 +94,12 @@ func (s *Server) CreateUser(w http.ResponseWriter, r *http.Request) {
 	}
 	hash, err := common.HashPassword(req.Password)
 	if err != nil {
-		s.internalError(w, err)
+		s.internalError(w, r, err)
 		return
 	}
 	uid, err := common.NewUID()
 	if err != nil {
-		s.internalError(w, err)
+		s.internalError(w, r, err)
 		return
 	}
 	u := &model.User{
@@ -118,7 +118,7 @@ func (s *Server) CreateUser(w http.ResponseWriter, r *http.Request) {
 			Fail(w, CodeUserExists, "用户名、手机号或邮箱已存在")
 			return
 		}
-		s.internalError(w, err)
+		s.internalError(w, r, err)
 		return
 	}
 	OK(w, u.SafeUser())
@@ -172,12 +172,12 @@ func (s *Server) UpdateUser(w http.ResponseWriter, r *http.Request) {
 			Fail(w, CodeUserExists, "手机号或邮箱已被其他用户使用")
 			return
 		}
-		s.internalError(w, err)
+		s.internalError(w, r, err)
 		return
 	}
 	u, err := s.Users.GetByID(r.Context(), id)
 	if err != nil {
-		s.internalError(w, err)
+		s.internalError(w, r, err)
 		return
 	}
 	OK(w, u.SafeUser())
@@ -195,11 +195,11 @@ func (s *Server) DeleteUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.Grants.DeleteByUser(r.Context(), id); err != nil {
-		s.internalError(w, err)
+		s.internalError(w, r, err)
 		return
 	}
 	if err := s.Users.Delete(r.Context(), id); err != nil {
-		s.internalError(w, err)
+		s.internalError(w, r, err)
 		return
 	}
 	OK(w, nil)
@@ -225,7 +225,7 @@ func (s *Server) ResetPassword(w http.ResponseWriter, r *http.Request) {
 		// 自动生成符合策略的随机密码
 		password, err = common.GeneratePassword(policy)
 		if err != nil {
-			s.internalError(w, err)
+			s.internalError(w, r, err)
 			return
 		}
 	} else {
@@ -237,11 +237,11 @@ func (s *Server) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	}
 	hash, err := common.HashPassword(password)
 	if err != nil {
-		s.internalError(w, err)
+		s.internalError(w, r, err)
 		return
 	}
 	if err := s.Users.Update(r.Context(), id, map[string]any{"password_hash": hash}); err != nil {
-		s.internalError(w, err)
+		s.internalError(w, r, err)
 		return
 	}
 	if req.NewPassword == "" {

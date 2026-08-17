@@ -11,10 +11,12 @@ type User struct {
 	Nickname       string `gorm:"size:64;default:''" json:"nickname"`
 	NicknamePinyin string `gorm:"size:128;default:''" json:"nickname_pinyin"`
 	// Phone/Email 可空（NULL 不参与唯一约束，允许空值重复）
-	Phone *string `gorm:"size:20;uniqueIndex" json:"phone"`
-	Email *string `gorm:"size:128;uniqueIndex" json:"email"`
-	// TOTPSecret 双因子 TOTP 密钥（base32，空表示未启用 TOTP）
-	TOTPSecret  string `gorm:"size:64;default:''" json:"-"`
+	Phone       *string `gorm:"size:128;uniqueIndex" json:"phone"`
+	Email       *string `gorm:"size:255;uniqueIndex" json:"email"`
+	PhoneSHA256 string  `gorm:"size:64;index;default:''" json:"-"`
+	EmailSHA256 string  `gorm:"size:64;index;default:''" json:"-"`
+	// TOTPSecret 双因子 TOTP 密钥（base32，空表示未启用 TOTP；明文存储）
+	TOTPSecret  string `gorm:"size:128;default:''" json:"-"`
 	TOTPEnabled bool   `gorm:"default:false" json:"totp_enabled"`
 	// Category 用户分类（开发/测试/运营/风控/数分等，管理员在系统设置维护），用于快捷授权平台。
 	Category string `gorm:"size:64;default:''" json:"category"`

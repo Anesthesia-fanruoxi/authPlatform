@@ -7,6 +7,12 @@ authPlatform
 server.log
 *.log
 
+# 配置文件（含密钥，不可提交）
+config.yaml
+
+# 本地数据（SQLite 等）
+local/
+
 # IDE
 .idea/
 .vscode/

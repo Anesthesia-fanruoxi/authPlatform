@@ -39,12 +39,12 @@ func (s *Server) SaveTOTP(w http.ResponseWriter, r *http.Request) {
 			Fail(w, CodeBadCred, "账号或密码错误")
 			return
 		}
-		s.internalError(w, err)
+		s.internalError(w, r, err)
 		return
 	}
 	granted, err := s.Grants.Granted(r.Context(), u.ID, p.ID)
 	if err != nil {
-		s.internalError(w, err)
+		s.internalError(w, r, err)
 		return
 	}
 	if !granted {
@@ -58,7 +58,7 @@ func (s *Server) SaveTOTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.Users.Update(r.Context(), u.ID, map[string]any{"totp_secret": strings.ToUpper(req.Secret), "totp_enabled": true}); err != nil {
-		s.internalError(w, err)
+		s.internalError(w, r, err)
 		return
 	}
 	OK(w, map[string]any{"totp_enabled": true})

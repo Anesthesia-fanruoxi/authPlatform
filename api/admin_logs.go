@@ -17,7 +17,7 @@ func (s *Server) ListLogs(w http.ResponseWriter, r *http.Request) {
 	limit, _ := strconv.Atoi(q.Get("limit"))
 	list, err := s.Audit.ListLogin(r.Context(), q.Get("username"), q.Get("platform_id"), success, limit)
 	if err != nil {
-		s.internalError(w, err)
+		s.internalError(w, r, err)
 		return
 	}
 	OK(w, map[string]any{"logs": list})

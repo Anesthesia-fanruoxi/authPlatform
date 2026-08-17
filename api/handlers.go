@@ -4,11 +4,11 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"log"
 	"net/http"
 	"time"
 
 	"authplatform/common"
+	"authplatform/config"
 )
 
 type Server struct {
@@ -16,13 +16,16 @@ type Server struct {
 	Platforms *common.PlatformStore
 	Grants    *common.GrantStore
 	Audit     *common.AuditStore
-	Settings  *common.SettingsStore // 系统设置（密码策略/限流/登录方式/后台IP白名单）
-	Tickets   *common.TicketStore   // 多步骤登录临时票据
-	VerCodes  *common.VerCodeStore  // 登录验证码（dev 模式）
+	Settings  *common.SettingsStore
+	Tickets   *common.TicketStore
+	VerCodes  *common.VerCodeStore
 	Secret    string
-	MasterKey string
 	TokenTTL  time.Duration
-	Limiter   *common.RateLimiter // 登录限流（账号维度，管理端与平台侧共用）
+	Limiter   *common.RateLimiter
+	// Initialized 完整服务已初始化（防重复配置；setup 模式下为 false）
+	Initialized bool
+	// OnSetupSaved 热初始化回调：setup 保存配置后由 main 注入，负责连库并切换路由
+	OnSetupSaved func(*config.Config) error
 }
 
 func (s *Server) Health(w http.ResponseWriter, _ *http.Request) {
@@ -43,7 +46,9 @@ func (s *Server) Login(w http.ResponseWriter, r *http.Request) {
 	reqHeaders := common.SanitizeRequestHeaders(r.Header)
 	reqBody := common.SanitizeRequestBody(body)
 	audit := func(username string, success int, reason string) {
-		_ = s.Audit.WriteLoginDetail(r.Context(), username, "", success, reason, clientIP(r), reqHeaders, reqBody)
+		if s.Audit != nil {
+			_ = s.Audit.WriteLoginDetail(r.Context(), username, "", success, reason, clientIP(r), reqHeaders, reqBody)
+		}
 	}
 	var req LoginRequest
 	if err := json.Unmarshal(body, &req); err != nil || req.Username == "" || req.Password == "" {
@@ -53,11 +58,13 @@ func (s *Server) Login(w http.ResponseWriter, r *http.Request) {
 	}
 	ip := clientIP(r)
 	// 后台登录 IP 白名单（内网限制；未配置则不限制）
-	wl := s.Settings.GetAdminIPWhitelist(r.Context())
-	if len(wl.IPs) > 0 && !ipInList(ip, wl.IPs) {
-		audit(req.Username, 0, "ip_denied")
-		Fail(w, CodeIPDenied, "IP 不在后台登录白名单")
-		return
+	if s.Settings != nil {
+		wl := s.Settings.GetAdminIPWhitelist(r.Context())
+		if len(wl.IPs) > 0 && !ipInList(ip, wl.IPs) {
+			audit(req.Username, 0, "ip_denied")
+			Fail(w, CodeIPDenied, "IP 不在后台登录白名单")
+			return
+		}
 	}
 	// 登录限流 + 黑名单（账号维度）
 	if err := s.Limiter.Check(req.Username); err != nil {
@@ -70,6 +77,14 @@ func (s *Server) Login(w http.ResponseWriter, r *http.Request) {
 		Fail(w, CodeLocked, err.Error())
 		return
 	}
+
+	// 降级到 MySQL（Users 为 nil 时直接拒绝）
+	if s.Users == nil {
+		s.Limiter.RecordFail(req.Username)
+		audit(req.Username, 0, "bad_cred")
+		Fail(w, CodeBadCred, "数据库未连接")
+		return
+	}
 	u, err := s.Users.GetByUsername(r.Context(), req.Username)
 	if err != nil {
 		if errors.Is(err, common.ErrNotFound) {
@@ -78,7 +93,7 @@ func (s *Server) Login(w http.ResponseWriter, r *http.Request) {
 			Fail(w, CodeBadCred, "账号或密码错误")
 			return
 		}
-		s.internalError(w, err)
+		s.internalError(w, r, err)
 		return
 	}
 	if !u.IsAdmin {
@@ -89,7 +104,7 @@ func (s *Server) Login(w http.ResponseWriter, r *http.Request) {
 	}
 	ok, err := common.VerifyPassword(u.PasswordHash, req.Password)
 	if err != nil {
-		s.internalError(w, err)
+		s.internalError(w, r, err)
 		return
 	}
 	if !ok {
@@ -107,7 +122,7 @@ func (s *Server) Login(w http.ResponseWriter, r *http.Request) {
 	audit(req.Username, 1, "admin_login")
 	token, err := common.SignSessionToken(s.Secret, u.ID, s.TokenTTL)
 	if err != nil {
-		s.internalError(w, err)
+		s.internalError(w, r, err)
 		return
 	}
 	// 管理后台单点登录：新登录覆盖旧 token，同一账号只生效一个会话
@@ -120,7 +135,7 @@ func (s *Server) Me(w http.ResponseWriter, r *http.Request) {
 	userID, _ := r.Context().Value(CtxKeyUserID).(int64)
 	u, err := s.Users.GetByID(r.Context(), userID)
 	if err != nil {
-		s.internalError(w, err)
+		s.internalError(w, r, err)
 		return
 	}
 	OK(w, u.SafeUser())
@@ -139,7 +154,7 @@ func (s *Server) MeChangePassword(w http.ResponseWriter, r *http.Request) {
 	}
 	u, err := s.Users.GetByID(r.Context(), userID)
 	if err != nil {
-		s.internalError(w, err)
+		s.internalError(w, r, err)
 		return
 	}
 	ok, _ := common.VerifyPassword(u.PasswordHash, req.OldPassword)
@@ -154,17 +169,17 @@ func (s *Server) MeChangePassword(w http.ResponseWriter, r *http.Request) {
 	}
 	hash, err := common.HashPassword(req.NewPassword)
 	if err != nil {
-		s.internalError(w, err)
+		s.internalError(w, r, err)
 		return
 	}
 	if err := s.Users.Update(r.Context(), userID, map[string]any{"password_hash": hash}); err != nil {
-		s.internalError(w, err)
+		s.internalError(w, r, err)
 		return
 	}
 	OK(w, nil)
 }
 
-func (s *Server) internalError(w http.ResponseWriter, err error) {
-	log.Printf("[ERROR] %v", err)
+func (s *Server) internalError(w http.ResponseWriter, r *http.Request, err error) {
+	common.LogError(r.Method+" "+r.URL.Path, "%v", err)
 	Fail(w, CodeInternal, "内部错误")
 }

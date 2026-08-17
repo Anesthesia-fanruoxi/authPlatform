@@ -16,7 +16,7 @@ var platformIDRe = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}$`)
 
 // safePlatform 脱敏平台信息：不泄露 secret 明文；showSecret 时返回完整明文
 // （仅用于创建/轮换后的一次性展示）。login_methods 输出解析后的数组。
-func safePlatform(p *model.Platform, masterKey string, showSecret bool) map[string]any {
+func safePlatform(p *model.Platform, showSecret bool) map[string]any {
 	out := map[string]any{
 		"id":                   p.ID,
 		"platform_id":          p.PlatformID,
@@ -28,7 +28,7 @@ func safePlatform(p *model.Platform, masterKey string, showSecret bool) map[stri
 		"login_methods_custom": p.LoginMethods != "",
 		"auth_mode":            p.AuthMode,
 	}
-	if plain, err := common.DecryptSecret(masterKey, p.SecretEnc); err == nil {
+	if plain := p.SecretEnc; plain != "" {
 		if showSecret {
 			out["secret"] = plain
 		} else if len(plain) > 8 {
@@ -36,9 +36,6 @@ func safePlatform(p *model.Platform, masterKey string, showSecret bool) map[stri
 		} else {
 			out["secret_masked"] = "***"
 		}
-	}
-	if p.SecretOldEnc != "" {
-		out["has_old_secret"] = true // 处于双盐过渡期
 	}
 	return out
 }
@@ -59,17 +56,17 @@ func platformLoginMethods(p *model.Platform) []string {
 func (s *Server) ListPlatforms(w http.ResponseWriter, r *http.Request) {
 	list, err := s.Platforms.List(r.Context())
 	if err != nil {
-		s.internalError(w, err)
+		s.internalError(w, r, err)
 		return
 	}
 	out := make([]map[string]any, 0, len(list))
 	for _, p := range list {
-		out = append(out, safePlatform(p, s.MasterKey, false))
+		out = append(out, safePlatform(p, false))
 	}
 	OK(w, map[string]any{"platforms": out})
 }
 
-// CreatePlatform 创建平台：生成独立盐并加密存储，明文仅此一次返回。
+// CreatePlatform 创建平台：生成独立盐明文存储，明文仅此一次返回。
 // login_methods 可选：空 = 使用系统设置中的新平台默认登录方式。
 func (s *Server) CreatePlatform(w http.ResponseWriter, r *http.Request) {
 	var req struct {
@@ -103,18 +100,13 @@ func (s *Server) CreatePlatform(w http.ResponseWriter, r *http.Request) {
 	}
 	secret, err := common.NewPlatformSecret()
 	if err != nil {
-		s.internalError(w, err)
-		return
-	}
-	enc, err := common.EncryptSecret(s.MasterKey, secret)
-	if err != nil {
-		s.internalError(w, err)
+		s.internalError(w, r, err)
 		return
 	}
 	p := &model.Platform{
 		PlatformID:   req.PlatformID,
 		Name:         req.Name,
-		SecretEnc:    enc,
+		SecretEnc:    secret,
 		IPWhitelist:  req.IPWhitelist,
 		LoginMethods: lmText,
 		AuthMode:     authMode,
@@ -125,10 +117,10 @@ func (s *Server) CreatePlatform(w http.ResponseWriter, r *http.Request) {
 			Fail(w, CodeBadParam, "platform_id 已存在")
 			return
 		}
-		s.internalError(w, err)
+		s.internalError(w, r, err)
 		return
 	}
-	out := safePlatform(p, s.MasterKey, false)
+	out := safePlatform(p, false)
 	out["secret"] = secret // 仅此一次展示明文，请平台侧妥善保存
 	OK(w, out)
 }
@@ -190,15 +182,15 @@ func (s *Server) UpdatePlatform(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.Platforms.Update(r.Context(), id, updates); err != nil {
-		s.internalError(w, err)
+		s.internalError(w, r, err)
 		return
 	}
 	p, err := s.Platforms.GetByID(r.Context(), id)
 	if err != nil {
-		s.internalError(w, err)
+		s.internalError(w, r, err)
 		return
 	}
-	OK(w, safePlatform(p, s.MasterKey, false))
+	OK(w, safePlatform(p, false))
 }
 
 // DeletePlatform 删除平台（级联清理授权由 grant store 处理）。
@@ -209,59 +201,42 @@ func (s *Server) DeletePlatform(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.Grants.DeleteByPlatform(r.Context(), id); err != nil {
-		s.internalError(w, err)
+		s.internalError(w, r, err)
 		return
 	}
 	if err := s.Platforms.Delete(r.Context(), id); err != nil {
-		s.internalError(w, err)
+		s.internalError(w, r, err)
 		return
 	}
 	OK(w, nil)
 }
 
-// RotateSecret 密钥轮换：
-// - 无旧盐时：当前盐移入旧盐（进入双盐过渡期，新旧同时可验），生成新盐；
-// - 已有旧盐时：吊销旧盐（清空过渡盐），当前盐不变。
-// 首次调用返回新盐明文（仅此一次）；吊销调用不返回盐。
+// RotateSecret 密钥轮换：直接生成新盐覆盖当前盐（无过渡期，旧盐立即失效），
+// 返回新盐明文（仅此一次）。
 func (s *Server) RotateSecret(w http.ResponseWriter, r *http.Request) {
 	id, err := pathID(r)
 	if err != nil {
 		Fail(w, CodeBadParam, "参数错误")
 		return
 	}
-	p, err := s.Platforms.GetByID(r.Context(), id)
+	_, err = s.Platforms.GetByID(r.Context(), id)
 	if err != nil {
 		if errors.Is(err, common.ErrNotFound) {
 			Fail(w, CodeBadParam, "平台不存在")
 			return
 		}
-		s.internalError(w, err)
-		return
-	}
-	if p.SecretOldEnc != "" {
-		// 吊销旧盐（双盐过渡期结束）
-		if err := s.Platforms.Update(r.Context(), id, map[string]any{"secret_old_enc": ""}); err != nil {
-			s.internalError(w, err)
-			return
-		}
-		OK(w, map[string]any{"revoked": true})
+		s.internalError(w, r, err)
 		return
 	}
 	newSecret, err := common.NewPlatformSecret()
 	if err != nil {
-		s.internalError(w, err)
-		return
-	}
-	newEnc, err := common.EncryptSecret(s.MasterKey, newSecret)
-	if err != nil {
-		s.internalError(w, err)
+		s.internalError(w, r, err)
 		return
 	}
 	if err := s.Platforms.Update(r.Context(), id, map[string]any{
-		"secret_enc":     newEnc,
-		"secret_old_enc": p.SecretEnc,
+		"secret_enc": newSecret,
 	}); err != nil {
-		s.internalError(w, err)
+		s.internalError(w, r, err)
 		return
 	}
 	OK(w, map[string]any{"secret": newSecret})

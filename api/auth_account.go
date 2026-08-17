@@ -37,12 +37,12 @@ func (s *Server) ChangePassword(w http.ResponseWriter, r *http.Request) {
 			Fail(w, CodeBadCred, "账号或密码错误")
 			return
 		}
-		s.internalError(w, err)
+		s.internalError(w, r, err)
 		return
 	}
 	granted, err := s.Grants.Granted(r.Context(), u.ID, p.ID)
 	if err != nil {
-		s.internalError(w, err)
+		s.internalError(w, r, err)
 		return
 	}
 	if !granted {
@@ -51,7 +51,7 @@ func (s *Server) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	}
 	okPass, err := common.VerifyPassword(u.PasswordHash, req.OldPassword)
 	if err != nil {
-		s.internalError(w, err)
+		s.internalError(w, r, err)
 		return
 	}
 	if !okPass {
@@ -64,11 +64,11 @@ func (s *Server) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	}
 	hash, err := common.HashPassword(req.NewPassword)
 	if err != nil {
-		s.internalError(w, err)
+		s.internalError(w, r, err)
 		return
 	}
 	if err := s.Users.Update(r.Context(), u.ID, map[string]any{"password_hash": hash}); err != nil {
-		s.internalError(w, err)
+		s.internalError(w, r, err)
 		return
 	}
 	OK(w, nil)
@@ -105,12 +105,12 @@ func (s *Server) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 			Fail(w, CodeBadCred, "账号或密码错误")
 			return
 		}
-		s.internalError(w, err)
+		s.internalError(w, r, err)
 		return
 	}
 	granted, err := s.Grants.Granted(r.Context(), u.ID, p.ID)
 	if err != nil {
-		s.internalError(w, err)
+		s.internalError(w, r, err)
 		return
 	}
 	if !granted {
@@ -158,7 +158,7 @@ func (s *Server) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 		}
 		hash, err := common.HashPassword(*req.Password)
 		if err != nil {
-			s.internalError(w, err)
+			s.internalError(w, r, err)
 			return
 		}
 		updates["password_hash"] = hash
@@ -176,13 +176,13 @@ func (s *Server) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(updates) > 0 {
 		if err := s.Users.Update(r.Context(), u.ID, updates); err != nil {
-			s.internalError(w, err)
+			s.internalError(w, r, err)
 			return
 		}
 	}
 	updated, err := s.Users.GetByID(r.Context(), u.ID)
 	if err != nil {
-		s.internalError(w, err)
+		s.internalError(w, r, err)
 		return
 	}
 	OK(w, userWhitelist(updated))

@@ -28,7 +28,7 @@ func (s *Server) verifyPlatformRequest(w http.ResponseWriter, r *http.Request, b
 			Fail(w, CodePlatformDown, "平台不存在或已停用")
 			return nil, false
 		}
-		s.internalError(w, err)
+		s.internalError(w, r, err)
 		return nil, false
 	}
 	if p.Status != 1 {
@@ -39,24 +39,8 @@ func (s *Server) verifyPlatformRequest(w http.ResponseWriter, r *http.Request, b
 		Fail(w, CodeBadParam, "IP 不在白名单")
 		return nil, false
 	}
-	secrets := make([]string, 0, 2)
-	if sec, err := common.DecryptSecret(s.MasterKey, p.SecretEnc); err == nil {
-		secrets = append(secrets, sec)
-	}
-	if p.SecretOldEnc != "" {
-		if sec, err := common.DecryptSecret(s.MasterKey, p.SecretOldEnc); err == nil {
-			secrets = append(secrets, sec)
-		}
-	}
-	reqPath := r.URL.RequestURI()
-	ok := false
-	for _, sec := range secrets {
-		if common.VerifyPlatformSignature(sec, r.Method, reqPath, timestamp, string(body), sign) == nil {
-			ok = true
-			break
-		}
-	}
-	if !ok {
+	secret := p.SecretEnc
+	if secret == "" || common.VerifyPlatformSignature(secret, r.Method, r.URL.RequestURI(), timestamp, string(body), sign) != nil {
 		Fail(w, CodeSignInvalid, "平台签名无效")
 		return nil, false
 	}

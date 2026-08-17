@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"log"
 
 	"authplatform/model"
 	"gorm.io/gorm"
@@ -121,7 +120,7 @@ func (s *SettingsStore) getJSON(ctx context.Context, key string, out any) error 
 func (s *SettingsStore) GetPasswordPolicy(ctx context.Context) PasswordPolicy {
 	var p PasswordPolicy
 	if err := s.getJSON(ctx, "password_policy", &p); err != nil {
-		log.Printf("[settings] password_policy parse error: %v", err)
+		LogWarn("settings", "password_policy parse error: %v", err)
 		return defaultPasswordPolicy
 	}
 	if p.MinLength <= 0 {
@@ -134,7 +133,7 @@ func (s *SettingsStore) GetPasswordPolicy(ctx context.Context) PasswordPolicy {
 func (s *SettingsStore) GetLoginLimit(ctx context.Context) LoginLimit {
 	var l LoginLimit
 	if err := s.getJSON(ctx, "login_limit", &l); err != nil {
-		log.Printf("[settings] login_limit parse error: %v", err)
+		LogWarn("settings", "login_limit parse error: %v", err)
 		return defaultLoginLimit
 	}
 	if l.MaxFails <= 0 {
@@ -148,7 +147,7 @@ func (s *SettingsStore) GetLoginLimit(ctx context.Context) LoginLimit {
 func (s *SettingsStore) GetUserCategories(ctx context.Context) []string {
 	var c UserCategories
 	if err := s.getJSON(ctx, "user_categories", &c); err != nil {
-		log.Printf("[settings] user_categories parse error: %v", err)
+		LogWarn("settings", "user_categories parse error: %v", err)
 		return defaultUserCategories.Items
 	}
 	if len(c.Items) == 0 {
@@ -160,7 +159,7 @@ func (s *SettingsStore) GetUserCategories(ctx context.Context) []string {
 func (s *SettingsStore) GetLoginMethods(ctx context.Context) LoginMethods {
 	var m LoginMethods
 	if err := s.getJSON(ctx, "login_methods", &m); err != nil {
-		log.Printf("[settings] login_methods parse error: %v", err)
+		LogWarn("settings", "login_methods parse error: %v", err)
 		return defaultLoginMethods
 	}
 	if len(m.Methods) == 0 {
@@ -181,7 +180,7 @@ const defaultLogRetentionDays = 30
 func (s *SettingsStore) GetLogRetentionDays(ctx context.Context) int {
 	var r LogRetention
 	if err := s.getJSON(ctx, "log_retention", &r); err != nil {
-		log.Printf("[settings] log_retention parse error: %v", err)
+		LogWarn("settings", "log_retention parse error: %v", err)
 		return defaultLogRetentionDays
 	}
 	if r.Days < 1 || r.Days > 3650 {
@@ -194,7 +193,7 @@ func (s *SettingsStore) GetLogRetentionDays(ctx context.Context) int {
 func (s *SettingsStore) GetAdminIPWhitelist(ctx context.Context) AdminIPWhitelist {
 	var w AdminIPWhitelist
 	if err := s.getJSON(ctx, "admin_ip_whitelist", &w); err != nil {
-		log.Printf("[settings] admin_ip_whitelist parse error: %v", err)
+		LogWarn("settings", "admin_ip_whitelist parse error: %v", err)
 		return AdminIPWhitelist{}
 	}
 	return w

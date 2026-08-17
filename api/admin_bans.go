@@ -10,7 +10,7 @@ import (
 )
 
 // ListBans GET /api/admin/bans 返回全部黑名单/锁定记录。
-func (s *Server) ListBans(w http.ResponseWriter, r *http.Request) {
+func (s *Server) ListBans(w http.ResponseWriter, _ *http.Request) {
 	list := s.Limiter.ListBans()
 	now := time.Now()
 	out := make([]map[string]any, 0, len(list))
@@ -56,7 +56,7 @@ func (s *Server) AddBan(w http.ResponseWriter, r *http.Request) {
 			Fail(w, CodeBadParam, "账号不存在")
 			return
 		}
-		s.internalError(w, err)
+		s.internalError(w, r, err)
 		return
 	}
 	var expiresAt time.Time

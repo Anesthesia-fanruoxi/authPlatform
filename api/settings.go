@@ -14,7 +14,7 @@ import (
 func (s *Server) ListSettings(w http.ResponseWriter, r *http.Request) {
 	all, err := s.Settings.All(r.Context())
 	if err != nil {
-		s.internalError(w, err)
+		s.internalError(w, r, err)
 		return
 	}
 	OK(w, all)
@@ -24,12 +24,6 @@ func (s *Server) ListSettings(w http.ResponseWriter, r *http.Request) {
 // key: password_policy | login_limit | login_methods | admin_ip_whitelist
 func (s *Server) UpdateSettings(w http.ResponseWriter, r *http.Request) {
 	key := r.PathValue("key")
-	switch key {
-	case "password_policy", "login_limit", "login_methods", "admin_ip_whitelist", "user_categories", "log_retention":
-	default:
-		Fail(w, CodeBadParam, "不支持的设置项")
-		return
-	}
 	raw, err := readBody(r)
 	if err != nil {
 		Fail(w, CodeBadParam, "参数错误")
@@ -100,9 +94,12 @@ func (s *Server) UpdateSettings(w http.ResponseWriter, r *http.Request) {
 			c.Items[i] = it
 		}
 		saveErr = s.Settings.Set(r.Context(), key, c)
+	default:
+		Fail(w, CodeBadParam, "不支持的设置项")
+		return
 	}
 	if saveErr != nil {
-		s.internalError(w, saveErr)
+		s.internalError(w, r, saveErr)
 		return
 	}
 	// 限流策略立即生效
@@ -124,6 +121,6 @@ func ipInList(ip string, list []string) bool {
 
 // readBody 读取并返回请求体原始字节。
 func readBody(r *http.Request) ([]byte, error) {
-	defer r.Body.Close()
+	defer func() { _ = r.Body.Close() }()
 	return io.ReadAll(r.Body)
 }

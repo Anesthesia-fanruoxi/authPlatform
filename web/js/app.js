@@ -458,7 +458,6 @@ const PlatformsPage = {
           <div class="plat-secret">
             <span class="plat-secret-key">加密盐</span>
             <code>{{ row.secret_masked || '***' }}</code>
-            <el-tag v-if="row.has_old_secret" type="warning" size="small" effect="light" round>过渡期</el-tag>
           </div>
           <div class="plat-actions">
             <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
@@ -567,11 +566,7 @@ const PlatformsPage = {
     }
     async function rotate(row) {
       try {
-        await ElMessageBox.confirm(
-          row.has_old_secret
-            ? '当前处于双盐过渡期，再次轮换将吊销旧盐。确认继续？'
-            : '轮换后将进入双盐过渡期（新旧盐同时可验）。确认继续？',
-          '密钥轮换', { type: 'warning' });
+        await ElMessageBox.confirm('轮换后旧盐立即失效，平台侧需马上更换为新盐。确认继续？', '密钥轮换', { type: 'warning' });
       } catch { return; }
       try {
         const data = await api.rotateSecret(row.id);
@@ -591,10 +586,9 @@ const PlatformsPage = {
       } catch (e) { ElMessage.error(e.message); }
     }
     async function copySecret() {
-      try {
-        await navigator.clipboard.writeText(secretDlg.secret);
-        ElMessage.success('已复制');
-      } catch { ElMessage.warning('复制失败，请手动选择复制'); }
+      const ok = await copyText(secretDlg.secret);
+      if (ok) ElMessage.success('已复制');
+      else ElMessage.warning('复制失败，请手动选择复制');
     }
 
     return { platforms, loading, tableHeight, boxRef, dlg, secretDlg, methodOptions, loginMethodLabel, load, openCreate, openEdit, save, toggleStatus, rotate, del, copySecret };

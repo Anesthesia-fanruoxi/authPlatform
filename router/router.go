@@ -4,15 +4,13 @@ package router
 import (
 	"context"
 	"io/fs"
-	"log"
-	"net"
 	"net/http"
 	"path"
 	"strings"
-	"time"
 
 	"authplatform/api"
 	"authplatform/common"
+	"authplatform/config"
 	"authplatform/web"
 )
 
@@ -21,6 +19,11 @@ func New(s *api.Server) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", s.Health)
 	mux.HandleFunc("POST /api/admin/login", s.Login)
+	// 引导配置 API（config.yaml 不存在时可用）
+	mux.HandleFunc("GET /api/setup/available", s.SetupAvailable)
+	mux.HandleFunc("GET /api/setup/genkey", s.GenKey)
+	mux.HandleFunc("POST /api/setup/save", s.SaveSetup)
+	mux.HandleFunc("POST /api/setup/test", s.TestConn)
 	mux.HandleFunc("GET /api/admin/me", adminAuth(s.Users, s.Secret, s.Me))
 	mux.HandleFunc("POST /api/admin/me/password", adminAuth(s.Users, s.Secret, s.MeChangePassword))
 
@@ -69,7 +72,19 @@ func New(s *api.Server) http.Handler {
 
 	mux.HandleFunc("/", serveWeb) // 静态页兜底（未匹配到具体路由的请求）
 
-	return withRecovery(withLogging(mux))
+	return withRecovery(mux)
+}
+
+// NewSetupMode 组装 setup 模式路由（无配置文件/数据库未就绪时：仅 health + 引导配置 API + 初始化页）。
+func NewSetupMode(s *api.Server) http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/health", s.Health)
+	mux.HandleFunc("GET /api/setup/available", s.SetupAvailable)
+	mux.HandleFunc("GET /api/setup/genkey", s.GenKey)
+	mux.HandleFunc("POST /api/setup/save", s.SaveSetup)
+	mux.HandleFunc("POST /api/setup/test", s.TestConn)
+	mux.HandleFunc("/", serveSetupWeb)
+	return withRecovery(mux)
 }
 
 // adminAuth 管理后台鉴权中间件：仅允许「有效管理会话 token + 账号为管理员且启用」的用户通过。
@@ -77,6 +92,10 @@ func New(s *api.Server) http.Handler {
 // 与平台侧用户认证（平台签名 verifyPlatformRequest）完全独立。
 func adminAuth(users *common.UserStore, secret string, next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if users == nil {
+			api.Fail(w, api.CodeInternal, "数据库未连接")
+			return
+		}
 		token, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
 		if !ok || token == "" {
 			api.Fail(w, api.CodeUnauthorized, "未登录或登录已过期")
@@ -103,15 +122,40 @@ func adminAuth(users *common.UserStore, secret string, next http.HandlerFunc) ht
 	}
 }
 
-// serveWeb 提供内嵌前端资源；未匹配的 /api/* 返回业务错误。
+// serveWeb 提供内嵌前端资源；config.yaml 不存在时返回 setup.html 引导配置。
 func serveWeb(w http.ResponseWriter, r *http.Request) {
 	p := strings.TrimPrefix(r.URL.Path, "/")
 	if strings.HasPrefix(p, "api/") {
 		api.Fail(w, api.CodeBadParam, "接口不存在")
 		return
 	}
-	if p == "" {
-		p = "index.html"
+	// 根路径：config.yaml 不存在则返回 setup.html
+	if p == "" || p == "index.html" {
+		if !config.HasConfigFile() {
+			p = "setup.html"
+		} else {
+			p = "index.html"
+		}
+	}
+	data, err := fs.ReadFile(web.FS, p)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("Content-Type", contentType(p))
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(data)
+}
+
+// serveSetupWeb setup 模式静态页：根路径强制返回 setup.html（不受残留配置文件影响）。
+func serveSetupWeb(w http.ResponseWriter, r *http.Request) {
+	p := strings.TrimPrefix(r.URL.Path, "/")
+	if strings.HasPrefix(p, "api/") {
+		api.Fail(w, api.CodeBadParam, "接口不存在")
+		return
+	}
+	if p == "" || p == "index.html" {
+		p = "setup.html"
 	}
 	data, err := fs.ReadFile(web.FS, p)
 	if err != nil {
@@ -142,41 +186,12 @@ func contentType(p string) string {
 	}
 }
 
-// withLogging 简单访问日志。
-func withLogging(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		start := time.Now()
-		next.ServeHTTP(w, r)
-		log.Printf("%s %s %s", r.Method, r.URL.Path, time.Since(start))
-	})
-}
-
-// statusWriter 捕获写入的 HTTP 状态码（默认 200）。
-type statusWriter struct {
-	http.ResponseWriter
-	status int
-}
-
-func (w *statusWriter) WriteHeader(code int) {
-	w.status = code
-	w.ResponseWriter.WriteHeader(code)
-}
-
-// clientIP 从 RemoteAddr 提取客户端 IP。
-func clientIP(r *http.Request) string {
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		return r.RemoteAddr
-	}
-	return host
-}
-
 // withRecovery 捕获 panic 并返回统一内部错误。
 func withRecovery(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if rec := recover(); rec != nil {
-				log.Printf("[PANIC] %v", rec)
+				common.LogError(r.Method+" "+r.URL.Path, "PANIC: %v", rec)
 				api.Fail(w, api.CodeInternal, "内部错误")
 			}
 		}()

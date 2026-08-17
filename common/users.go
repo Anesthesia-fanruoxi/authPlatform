@@ -10,6 +10,7 @@ import (
 
 var ErrNotFound = errors.New("not found")
 
+// UserStore 用户存取：全部字段明文存储。
 type UserStore struct {
 	db *gorm.DB
 }
@@ -31,30 +32,43 @@ func (s *UserStore) GetByUsername(ctx context.Context, username string) (*model.
 	return &u, err
 }
 
-// GetByIdentifier 按登录标识查用户：优先 username，其次 email，再 phone（均精确匹配）。
+// GetByIdentifier 按登录标识查用户：优先 username（SQL 精确），其次 email/phone 精确匹配。
 func (s *UserStore) GetByIdentifier(ctx context.Context, identifier string) (*model.User, error) {
+	// 1. username 精确匹配（可索引）
 	var u model.User
-	err := s.db.WithContext(ctx).
-		Where("username = ? OR email = ? OR phone = ?", identifier, identifier, identifier).
-		First(&u).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, ErrNotFound
+	err := s.db.WithContext(ctx).Where("username = ?", identifier).First(&u).Error
+	if err == nil {
+		return &u, nil
 	}
-	return &u, err
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+	// 2. email / phone 精确匹配
+	if u2, err := s.findByField(ctx, "email", identifier); err == nil {
+		return u2, nil
+	} else if !errors.Is(err, ErrNotFound) {
+		return nil, err
+	}
+	if u2, err := s.findByField(ctx, "phone", identifier); err == nil {
+		return u2, nil
+	} else if !errors.Is(err, ErrNotFound) {
+		return nil, err
+	}
+	return nil, ErrNotFound
 }
 
 func (s *UserStore) GetByEmail(ctx context.Context, email string) (*model.User, error) {
-	var u model.User
-	err := s.db.WithContext(ctx).Where("email = ?", email).First(&u).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, ErrNotFound
-	}
-	return &u, err
+	return s.findByField(ctx, "email", email)
 }
 
 func (s *UserStore) GetByPhone(ctx context.Context, phone string) (*model.User, error) {
+	return s.findByField(ctx, "phone", phone)
+}
+
+// findByField 按字段值精确匹配单个用户（用于 email/phone）。
+func (s *UserStore) findByField(ctx context.Context, column, value string) (*model.User, error) {
 	var u model.User
-	err := s.db.WithContext(ctx).Where("phone = ?", phone).First(&u).Error
+	err := s.db.WithContext(ctx).Where(column+" = ?", value).First(&u).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, ErrNotFound
 	}
@@ -106,8 +120,7 @@ type UserFilter struct {
 	TOTPEnabled  *bool  // 双因子启用(true)/未启用(false)
 }
 
-// List 按条件返回用户列表（keyword 模糊匹配用户名/昵称；excludeAdmins 排除超级管理员；
-// category 精确分类；hasCategory 已分类/未分类；status 启用/禁用；totpEnabled 双因子状态）。按 id 升序。
+// List 按条件返回用户列表。
 func (s *UserStore) List(ctx context.Context, f UserFilter) ([]*model.User, error) {
 	q := s.db.WithContext(ctx).Model(&model.User{})
 	if f.Keyword != "" {
@@ -140,7 +153,7 @@ func (s *UserStore) List(ctx context.Context, f UserFilter) ([]*model.User, erro
 	return users, nil
 }
 
-// Update 以 map 更新指定字段（避免零值被忽略的问题）。
+// Update 以 map 更新指定字段。
 func (s *UserStore) Update(ctx context.Context, id int64, updates map[string]any) error {
 	return s.db.WithContext(ctx).Model(&model.User{}).Where("id = ?", id).Updates(updates).Error
 }
