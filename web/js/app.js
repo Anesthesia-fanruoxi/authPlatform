@@ -145,7 +145,7 @@ const UsersPage = {
         <div style="display:flex;justify-content:space-between;align-items:center">
           <div class="card-title">${svg('users')}用户管理</div>
           <div>
-            <el-input v-model="keyword" placeholder="搜索用户名/昵称" style="width:200px;margin-right:8px" clearable @keyup.enter="load">
+            <el-input v-model="keyword" placeholder="搜索用户名/昵称/拼音（支持子序列）" style="width:200px;margin-right:8px" clearable @keyup.enter="load">
               <template #prefix>${svg('user', 'ipt-ic')}</template>
             </el-input>
             <el-select v-model="statusFilter" placeholder="状态" clearable style="width:100px;margin-right:8px" @change="load">

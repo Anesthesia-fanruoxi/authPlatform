@@ -3,12 +3,28 @@ package common
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"authplatform/model"
 	"gorm.io/gorm"
 )
 
 var ErrNotFound = errors.New("not found")
+
+// subseqLike 构造子序列匹配模式：关键字每字符间插 %（兼容连续子串），转义 LIKE 通配符。
+func subseqLike(k string) string {
+	var b strings.Builder
+	for i, r := range []rune(k) {
+		if i > 0 {
+			b.WriteByte('%')
+		}
+		if r == '%' || r == '_' || r == '\\' {
+			b.WriteByte('\\')
+		}
+		b.WriteRune(r)
+	}
+	return b.String() + "%"
+}
 
 // UserStore 用户存取：全部字段明文存储。
 type UserStore struct {
@@ -93,15 +109,15 @@ func (s *UserStore) GetByUID(ctx context.Context, uid string) (*model.User, erro
 	return &u, err
 }
 
-// ListByIDs 按 ID 集合返回用户（可选 keyword 过滤用户名/昵称）。
+// ListByIDs 按 ID 集合返回用户（可选 keyword 子序列匹配用户名/昵称/拼音）。
 func (s *UserStore) ListByIDs(ctx context.Context, ids []int64, keyword string) ([]*model.User, error) {
 	if len(ids) == 0 {
 		return []*model.User{}, nil
 	}
 	q := s.db.WithContext(ctx).Model(&model.User{}).Where("id IN ?", ids)
 	if keyword != "" {
-		like := "%" + keyword + "%"
-		q = q.Where("username LIKE ? OR nickname LIKE ?", like, like)
+		like := subseqLike(keyword)
+		q = q.Where("username LIKE ? OR nickname LIKE ? OR nickname_pinyin LIKE ?", like, like, like)
 	}
 	var users []*model.User
 	if err := q.Order("id ASC").Find(&users).Error; err != nil {
@@ -112,7 +128,7 @@ func (s *UserStore) ListByIDs(ctx context.Context, ids []int64, keyword string) 
 
 // UserFilter 用户列表筛选条件。
 type UserFilter struct {
-	Keyword      string // 模糊匹配用户名/昵称
+	Keyword      string // 子序列匹配用户名/昵称/拼音
 	ExcludeAdmin bool   // 排除超级管理员
 	Category     string // 精确分类（非空时生效）
 	HasCategory  *bool  // 已分类(true)/未分类(false)，与 Category 互斥
@@ -124,8 +140,8 @@ type UserFilter struct {
 func (s *UserStore) List(ctx context.Context, f UserFilter) ([]*model.User, error) {
 	q := s.db.WithContext(ctx).Model(&model.User{})
 	if f.Keyword != "" {
-		like := "%" + f.Keyword + "%"
-		q = q.Where("username LIKE ? OR nickname LIKE ?", like, like)
+		like := subseqLike(f.Keyword)
+		q = q.Where("username LIKE ? OR nickname LIKE ? OR nickname_pinyin LIKE ?", like, like, like)
 	}
 	if f.ExcludeAdmin {
 		q = q.Where("is_admin = ?", false)
